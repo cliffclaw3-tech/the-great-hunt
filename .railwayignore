@@ -1,0 +1,12 @@
+.env
+.env.*
+env/
+node_modules/
+.DS_Store
+*.log
+*.zip
+The_Great_Hunt_Concept_v0.1.docx
+case knife.jpeg
+linear-prototype-plan.md
+EBAY-MARKETPLACE-INSIGHTS-REQUEST.md
+public-landing/

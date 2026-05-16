@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "start": "node server.js",
+    "start:production": "NODE_ENV=production node server.js",
+    "check": "node --check server.js && node --check app.js && node --check providers/ebay.js && node --check providers/reverb.js && node --check providers/crawl4ai.js && node --check providers/productLookup.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1"
+  }
+}

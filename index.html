@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#257653" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Great Hunt" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>The Great Hunt</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/assets/app-icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/app-icon-180.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section id="betaGate" class="beta-gate" aria-label="Beta access" hidden>
+      <form id="betaGateForm" class="beta-gate-card">
+        <div class="brand">
+          <div class="brand-mark">GH</div>
+          <div>
+            <strong>The Great Hunt</strong>
+            <span>Private beta</span>
+          </div>
+        </div>
+        <div>
+          <p class="eyebrow">Tester access</p>
+          <h1>Enter your beta code.</h1>
+          <p class="beta-gate-copy">This keeps the June beta private while we tune the hunt, comps, and saved-find workflow.</p>
+          <p class="beta-gate-copy">By testing, you agree to treat prices as estimates, keep screenshots private, and avoid sharing photos or seller details outside the beta group.</p>
+        </div>
+        <label>
+          Access code
+          <input id="betaAccessCode" type="password" autocomplete="one-time-code" placeholder="Ask Wes for the code" />
+        </label>
+        <button class="primary-action" type="submit">Unlock The Great Hunt</button>
+        <p id="betaGateMessage" class="beta-gate-message" role="status"></p>
+      </form>
+    </section>
+
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary">
+        <div class="brand">
+          <div class="brand-mark">GH</div>
+          <div>
+            <strong>The Great Hunt</strong>
+            <span>Weekend treasure map</span>
+          </div>
+        </div>
+
+        <nav class="nav-tabs" aria-label="Views">
+          <button class="nav-tab is-active" data-view="feed" type="button">Feed</button>
+          <button class="nav-tab" data-view="radar" type="button">Radar</button>
+          <button class="nav-tab" data-view="lookup" type="button">Lookup</button>
+          <button class="nav-tab" data-view="queue" type="button">Queue</button>
+          <button class="nav-tab" data-view="protocols" type="button">Protocols</button>
+          <button class="nav-tab" data-view="contest" type="button">Contest</button>
+        </nav>
+
+        <a class="setup-shortcut" href="/setup.html">API setup</a>
+
+        <section class="threshold-panel" aria-label="Thresholds" data-tour="filters">
+          <div class="panel-heading">
+            <span>Filters</span>
+            <output id="qualifiedCount">0</output>
+            <button id="filterClose" class="icon-action filter-close" type="button" aria-label="Close filters">×</button>
+          </div>
+
+          <label>
+            <span>Minimum profit</span>
+            <strong id="profitValue">$150</strong>
+            <input id="profitSlider" type="range" min="25" max="1000" step="25" value="150" />
+          </label>
+
+          <label>
+            <span>Minimum margin</span>
+            <strong id="marginValue">35%</strong>
+            <input id="marginSlider" type="range" min="10" max="80" step="5" value="35" />
+          </label>
+
+          <label>
+            <span>Pickup radius</span>
+            <strong id="radiusValue">40 mi</strong>
+            <input id="radiusSlider" type="range" min="5" max="150" step="5" value="40" />
+          </label>
+        </section>
+
+        <section class="beta-notice" aria-label="Beta safety and privacy">
+          <span class="pill danger">Beta guardrails</span>
+          <p>Prices are estimates, not a guarantee of profit. Photos help identify finds and compare comps. For meetups, avoid carrying lots of cash and inspect before paying.</p>
+        </section>
+      </aside>
+
+      <main>
+        <section class="mobile-hero-brand" aria-label="The Great Hunt">
+          <div class="brand">
+            <div class="brand-mark">GH</div>
+            <div>
+              <strong>The Great Hunt</strong>
+              <span>Find treasure</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="hero-band" aria-label="Hunt workspace" data-tour="hero">
+          <img src="assets/treasure-map-hero-compass.png" alt="Treasure map, brass compass, route marks, loupe, pencil, and phone arranged for a weekend hunt" />
+          <div class="hero-copy">
+            <span>Weekend warrior mode</span>
+            <h1>Find the treasure hiding in plain sight.</h1>
+            <p>Snap it, comp it, check the condition traps, and decide for yourself whether the spread is worth the trip.</p>
+          </div>
+        </section>
+
+        <div class="status-strip hero-status" aria-label="Digest status">
+          <span><strong>5</strong> hunting grounds</span>
+          <span><strong id="watchlistCount">0</strong> watchlists</span>
+          <span><strong>6:30</strong> refresh</span>
+        </div>
+
+        <section class="mobile-view-actions" aria-label="Quick views" data-tour="views">
+          <button class="big-intent-button" data-start-camera type="button">
+            <strong>Take picture</strong>
+            <span>Use the camera first</span>
+          </button>
+          <button class="big-intent-button" data-view-jump="lookup" type="button">
+            <strong>I found something</strong>
+            <span>Type or say what it is</span>
+          </button>
+          <button class="big-intent-button" data-view-jump="radar" type="button">
+            <strong>Look for treasure</strong>
+            <span>Tell me what to search for</span>
+          </button>
+        </section>
+
+        <section id="feedView" class="view is-active">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Browse finds</p>
+              <h2>Pick a hunting ground</h2>
+              <p class="section-help">Use these buttons to filter the finds below. To start fresh, tap “I found something” or “Look for treasure.”</p>
+            </div>
+            <div class="segmented" role="tablist" aria-label="Hunting ground filter">
+              <button class="is-active" data-ground="all" type="button">All</button>
+              <button data-ground="Estate sale" type="button">Estate</button>
+              <button data-ground="Auction" type="button">Auction</button>
+              <button data-ground="Antique shop" type="button">Antique</button>
+              <button data-ground="Marketplace" type="button">Marketplace</button>
+              <button data-ground="Closeout aisle" type="button">Closeout</button>
+            </div>
+          </div>
+          <div id="dealGrid" class="deal-grid" aria-live="polite"></div>
+        </section>
+
+        <section id="radarView" class="view">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Look around</p>
+              <h2>Find things near me</h2>
+            </div>
+          </div>
+          <div class="radar-layout">
+            <form id="radarForm" class="tool-panel">
+              <div class="section-title compact">
+                <div>
+                  <p class="eyebrow">Find treasure</p>
+                  <h2>What should I look for?</h2>
+                </div>
+              </div>
+              <div class="form-pair">
+                <label>
+                  Where are you?
+                  <input id="radarZip" type="text" placeholder="Your ZIP" />
+                </label>
+                <label>
+                  How far?
+                  <input id="radarRadius" type="number" min="1" placeholder="Miles" />
+                </label>
+              </div>
+              <label>
+                What treasure do you seek?
+                <input id="radarKeywords" type="text" placeholder="Tools, guitars, watches, toys..." />
+              </label>
+              <details class="simple-options">
+                <summary>More choices</summary>
+                <label>
+                  Web page links
+                  <textarea id="radarSources" rows="5" placeholder="Paste sale or auction links here"></textarea>
+                </label>
+              </details>
+              <button class="primary-action" type="submit">Find treasure</button>
+            </form>
+            <div class="radar-stack">
+              <div class="queue-summary">
+                <span class="pill">How it helps</span>
+                <p>Tell the app what you want. It looks for places and items worth checking.</p>
+              </div>
+              <div class="safety-summary">
+                <span class="pill danger">Meet-up safety</span>
+                <p>Do not meet strangers alone with a lot of cash. Prefer a public daylight exchange spot, bring another person, and inspect the item before any payment.</p>
+              </div>
+              <div id="radarResults" class="radar-grid" aria-live="polite"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="lookupView" class="view">
+          <div class="lookup-layout">
+            <form id="lookupForm" class="tool-panel">
+              <div class="section-title compact">
+                <div>
+                  <p class="eyebrow">Check it</p>
+                  <h2>What did you find?</h2>
+                </div>
+              </div>
+              <div class="photo-picker lookup-photo-first">
+                <span>Take a picture</span>
+                <div class="photo-action-row">
+                  <label class="photo-action photo-action-camera">
+                    <input id="lookupPhotoCamera" type="file" accept="image/*" capture="environment" />
+                    <span aria-hidden="true" class="camera-mark"></span>
+                    Take picture
+                  </label>
+                  <label class="photo-action clearance-scan-action">
+                    <input id="clearanceTagCamera" type="file" accept="image/*" capture="environment" />
+                    Scan clearance tag
+                  </label>
+                  <label class="photo-action">
+                    <input id="lookupPhotoLibrary" type="file" accept="image/*" />
+                    Upload
+                  </label>
+                </div>
+              </div>
+              <div id="lookupPhotoPreview" class="photo-preview" aria-live="polite"></div>
+              <label>
+                What is it?
+                <input id="lookupItem" type="text" placeholder="Type or say what you found" />
+              </label>
+              <details class="simple-options">
+                <summary>More choices</summary>
+                <label>
+                  What kind of thing?
+                  <select id="lookupCategory">
+                    <option>Mixed sale</option>
+                    <option>Vintage audio</option>
+                    <option>Books</option>
+                    <option>Pens</option>
+                    <option>Watches</option>
+                    <option>Knives</option>
+                    <option>Instruments</option>
+                    <option>Retail arbitrage</option>
+                    <option>Tools</option>
+                    <option>Cameras</option>
+                    <option>Comic books</option>
+                    <option>Sports cards</option>
+                    <option>Sports memorabilia</option>
+                    <option>Coins</option>
+                    <option>Stamps</option>
+                    <option>Art and paintings</option>
+                    <option>Vases and pottery</option>
+                    <option>Jewelry</option>
+                  </select>
+                </label>
+                <label>
+                  Graded or signed?
+                  <select id="lookupCollectibleStatus">
+                    <option value="">Not sure</option>
+                    <option value="raw">Raw / not graded</option>
+                    <option value="graded">Graded</option>
+                    <option value="signed">Signed</option>
+                    <option value="authenticated">Authenticated</option>
+                  </select>
+                </label>
+                <label>
+                  Where did you find it?
+                  <select id="lookupGround">
+                    <option>Estate sale</option>
+                    <option>Auction</option>
+                    <option>Antique shop</option>
+                    <option>Marketplace</option>
+                    <option>Closeout aisle</option>
+                  </select>
+                </label>
+                <label>
+                  How does it look?
+                  <select id="lookupCondition">
+                    <option value="rough">Rough / untested</option>
+                    <option value="working">Working</option>
+                    <option value="clean" selected>Clean</option>
+                    <option value="restored">Restored / serviced</option>
+                    <option value="sealed">New / sealed</option>
+                  </select>
+                </label>
+                <label>
+                  Price they want
+                  <input id="lookupAsk" type="number" min="1" placeholder="Optional" />
+                </label>
+                <label>
+                  How far away?
+                  <input id="lookupDistance" type="number" min="0" placeholder="Optional" />
+                </label>
+                <label>
+                  Town or address
+                  <input id="lookupLocation" type="text" placeholder="Neighboring town or pickup spot" />
+                </label>
+              </details>
+              <button class="primary-action" type="submit">Check it</button>
+            </form>
+            <div id="lookupResult" class="lookup-result"></div>
+          </div>
+        </section>
+
+        <section id="queueView" class="view">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">My list</p>
+              <h2>Things I saved</h2>
+            </div>
+          </div>
+          <div class="queue-layout">
+            <form id="watchlistForm" class="tool-panel">
+              <div class="section-title compact">
+                <div>
+                  <p class="eyebrow">Saved search</p>
+                  <h2>Look for this</h2>
+                </div>
+              </div>
+              <label>
+                Search name
+                <input id="watchName" type="text" placeholder="Example: Saturday tool hunt" />
+              </label>
+              <label>
+                What should I watch for?
+                <input id="watchKeyword" type="text" placeholder="Example: Craftsman, Case, Fender" />
+              </label>
+              <label>
+                Where should I look?
+                <select id="watchGround">
+                  <option>Any</option>
+                  <option>Estate sale</option>
+                  <option>Auction</option>
+                  <option>Antique shop</option>
+                  <option>Marketplace</option>
+                  <option>Closeout aisle</option>
+                </select>
+              </label>
+              <div class="form-pair">
+                <label>
+                  Money goal
+                  <input id="watchProfit" type="number" min="0" placeholder="Optional" />
+                </label>
+                <label>
+                  Radius
+                  <input id="watchRadius" type="number" min="1" placeholder="Miles" />
+                </label>
+              </div>
+              <button class="primary-action" type="submit">Save search</button>
+            </form>
+            <div class="queue-stack">
+              <div class="queue-summary">
+                <span class="pill">Saved for later</span>
+                <p>Keep searches and finds here so you can come back to them.</p>
+              </div>
+              <div>
+                <div class="section-title compact">
+                  <div>
+                    <p class="eyebrow">Launch readiness</p>
+                    <h2>Beta checklist</h2>
+                  </div>
+                </div>
+                <div id="readinessPanel" class="readiness-grid" aria-live="polite"></div>
+              </div>
+              <div>
+                <div class="section-title compact">
+                  <div>
+                    <p class="eyebrow">Tester signal</p>
+                    <h2>Beta review</h2>
+                  </div>
+                </div>
+                <div id="betaReview" class="beta-review-grid" aria-live="polite"></div>
+              </div>
+              <div>
+                <div class="section-title compact">
+                  <div>
+                    <p class="eyebrow">Saved from lookup</p>
+                    <h2>Saved finds</h2>
+                  </div>
+                </div>
+                <div id="savedFindGrid" class="saved-find-grid" aria-live="polite"></div>
+              </div>
+              <div>
+                <div class="section-title compact">
+                  <div>
+                    <p class="eyebrow">Saved searches</p>
+                    <h2>Things to watch</h2>
+                  </div>
+                </div>
+                <div id="watchlistGrid" class="watchlist-grid" aria-live="polite"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="protocolsView" class="view">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Before you pay</p>
+              <h2>Trap checklist</h2>
+            </div>
+          </div>
+          <div id="protocolGrid" class="protocol-grid"></div>
+        </section>
+
+        <section id="contestView" class="view">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Phase 2</p>
+              <h2>Weekend warrior challenge</h2>
+            </div>
+          </div>
+          <div class="contest-board">
+            <div class="contest-summary">
+              <span class="pill">30 days</span>
+              <h3>$1k challenge</h3>
+              <p>Track starting stake, miles, receipts, sale proceeds, and verified profit without revealing your best hunting grounds by default.</p>
+            </div>
+            <ol id="leaderboard" class="leaderboard"></ol>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

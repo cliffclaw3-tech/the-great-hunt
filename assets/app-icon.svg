@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">The Great Hunt app icon</title>
+  <defs>
+    <linearGradient id="mark" x1="90" y1="72" x2="430" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1c2520"/>
+      <stop offset="0.55" stop-color="#286b99"/>
+      <stop offset="1" stop-color="#f5c24b"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#1c2520" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="#f8f2e3"/>
+  <rect x="58" y="58" width="396" height="396" rx="78" fill="url(#mark)" filter="url(#shadow)"/>
+  <path d="M124 363c53-80 111-136 173-169 32-17 65-29 99-36-48 37-84 84-108 140-13 30-22 63-28 99-30-18-59-29-86-32-18-2-35-3-50-2Z" fill="#fffdf7" opacity="0.14"/>
+  <circle cx="370" cy="151" r="32" fill="#f5c24b"/>
+  <path d="M365 102h10v98h-10zM321 146h98v10h-98z" fill="#fffdf7" opacity="0.84"/>
+  <text x="256" y="288" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="118" font-weight="900" fill="#fffdf7" letter-spacing="0">GH</text>
+  <path d="M151 330h210" stroke="#fffdf7" stroke-width="15" stroke-linecap="round" opacity="0.82"/>
+</svg>
