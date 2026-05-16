@@ -2660,9 +2660,13 @@ h3 {
 
   .mobile-view-actions {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
     margin-bottom: 18px;
+  }
+
+  .mobile-view-actions .big-intent-button {
+    grid-column: 1 / -1;
   }
 
   .big-intent-button {
@@ -2680,17 +2684,20 @@ h3 {
     box-shadow: 0 12px 28px rgba(35, 45, 38, 0.08);
   }
 
-  .big-intent-button:first-child {
+  .big-intent-button:first-child,
+  .mobile-view-actions .big-intent-button:nth-of-type(1) {
     border-color: rgba(245, 194, 75, 0.56);
     background: linear-gradient(135deg, rgba(245, 194, 75, 0.22), #fff 58%);
   }
 
-  .big-intent-button:nth-child(2) {
+  .big-intent-button:nth-child(2),
+  .mobile-view-actions .big-intent-button:nth-of-type(2) {
     border-color: rgba(21, 154, 140, 0.34);
     background: linear-gradient(135deg, rgba(21, 154, 140, 0.14), #fff 60%);
   }
 
-  .big-intent-button:nth-child(3) {
+  .big-intent-button:nth-child(3),
+  .mobile-view-actions .big-intent-button:nth-of-type(3) {
     border-color: rgba(111, 74, 168, 0.3);
     background: linear-gradient(135deg, rgba(111, 74, 168, 0.11), #fff 62%);
   }
