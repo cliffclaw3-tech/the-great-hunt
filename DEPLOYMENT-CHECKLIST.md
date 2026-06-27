@@ -76,6 +76,15 @@ After the app is deployed at a public HTTPS URL:
 
 The app now includes a web app manifest, app icon, theme color, and service worker so it can behave like a simple installed phone app once hosted publicly.
 
+## Updating installed phone apps
+
+After a new deploy, installed phone apps may keep the old service-worker cache for a short time.
+
+1. Close the app completely.
+2. Reopen it from the phone home screen.
+3. If it still looks old, open the public URL in the browser and refresh once.
+4. Reopen the installed app.
+
 Remind testers:
 
 - Prices are estimates, not a guarantee of profit.

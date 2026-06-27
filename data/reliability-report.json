@@ -1,0 +1,446 @@
+{
+  "updatedAt": "2026-06-27T15:19:26.481Z",
+  "suites": {
+    "redTeam": {
+      "label": "Red-team sweep",
+      "command": "npm run audit:redteam",
+      "total": 24,
+      "passed": 24,
+      "failed": 0,
+      "coverage": 100,
+      "ready": true,
+      "risks": [
+        "vague items",
+        "parts-only traps",
+        "replicas",
+        "wrong-category comps",
+        "precision collector cases"
+      ],
+      "failures": [],
+      "byPersona": [
+        {
+          "persona": "common",
+          "total": 2,
+          "passed": 2,
+          "coverage": 100
+        },
+        {
+          "persona": "condition",
+          "total": 2,
+          "passed": 2,
+          "coverage": 100
+        },
+        {
+          "persona": "fake-premium",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100
+        },
+        {
+          "persona": "parts-trap",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100
+        },
+        {
+          "persona": "precision",
+          "total": 3,
+          "passed": 3,
+          "coverage": 100
+        },
+        {
+          "persona": "replica",
+          "total": 3,
+          "passed": 3,
+          "coverage": 100
+        },
+        {
+          "persona": "vague",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100
+        },
+        {
+          "persona": "wrong-category",
+          "total": 2,
+          "passed": 2,
+          "coverage": 100
+        }
+      ],
+      "updatedAt": "2026-06-27T15:15:57.499Z"
+    },
+    "valuation": {
+      "label": "Valuation audit",
+      "command": "npm run audit:valuation",
+      "total": 22,
+      "passed": 22,
+      "failed": 0,
+      "coverage": 100,
+      "cleanCoverage": 100,
+      "ready": true,
+      "risks": [
+        "garage-sale lookups",
+        "collector precision",
+        "investor categories",
+        "dirty comps",
+        "weak evidence"
+      ],
+      "failures": [],
+      "personas": [
+        {
+          "persona": "garage-sale",
+          "total": 8,
+          "valued": 8,
+          "noValue": 0,
+          "baseline": 0,
+          "unknown": 0,
+          "dirty": 0,
+          "suspiciousLow": 0,
+          "weakEvidence": 0,
+          "slow": 0,
+          "missingFieldCheck": 0,
+          "missingResearchGuidance": 0,
+          "coverage": 100,
+          "cleanCoverage": 100
+        },
+        {
+          "persona": "collector",
+          "total": 6,
+          "valued": 6,
+          "noValue": 0,
+          "baseline": 0,
+          "unknown": 0,
+          "dirty": 0,
+          "suspiciousLow": 0,
+          "weakEvidence": 0,
+          "slow": 0,
+          "missingFieldCheck": 0,
+          "missingResearchGuidance": 0,
+          "coverage": 100,
+          "cleanCoverage": 100
+        },
+        {
+          "persona": "investor",
+          "total": 8,
+          "valued": 8,
+          "noValue": 0,
+          "baseline": 0,
+          "unknown": 0,
+          "dirty": 0,
+          "suspiciousLow": 0,
+          "weakEvidence": 0,
+          "slow": 0,
+          "missingFieldCheck": 0,
+          "missingResearchGuidance": 0,
+          "coverage": 100,
+          "cleanCoverage": 100
+        }
+      ],
+      "updatedAt": "2026-06-27T15:17:53.569Z"
+    },
+    "categories": {
+      "label": "Category sweep",
+      "command": "npm run audit:categories",
+      "total": 60,
+      "passed": 60,
+      "failed": 0,
+      "coverage": 100,
+      "ready": true,
+      "risks": [
+        "category-specific comp quality",
+        "weak categories",
+        "low price floors",
+        "missing field checks"
+      ],
+      "weakCategories": [],
+      "failures": [],
+      "byCategory": [
+        {
+          "category": "Books",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Cameras",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Coins",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Comic books",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Furniture",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Jewelry",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Lighting",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Pens",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Retail arbitrage",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Sports cards",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Tools",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Toys",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Vases and pottery",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Vintage audio",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Watches",
+          "total": 4,
+          "passed": 4,
+          "coverage": 100,
+          "failures": []
+        }
+      ],
+      "updatedAt": "2026-06-27T15:19:26.482Z"
+    },
+    "classifiedsFirehose": {
+      "label": "Classifieds firehose",
+      "command": "npm run audit:classifieds",
+      "total": 96,
+      "passed": 96,
+      "failed": 0,
+      "coverage": 100,
+      "decisionCoverage": 100,
+      "evidenceCoverage": 100,
+      "ready": true,
+      "liveEvidenceReady": true,
+      "risks": [
+        "messy classifieds wording",
+        "parts-only listings",
+        "local pickup noise",
+        "newspaper-style vague ads",
+        "Marketplace-style cross-post wording"
+      ],
+      "weakCategories": [],
+      "weakDecisionCategories": [],
+      "weakEvidenceCategories": [],
+      "failures": [],
+      "byCategory": [
+        {
+          "category": "Books",
+          "total": 6,
+          "passed": 6,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Cameras",
+          "total": 6,
+          "passed": 6,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Coins",
+          "total": 6,
+          "passed": 6,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Comic books",
+          "total": 5,
+          "passed": 5,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Furniture",
+          "total": 6,
+          "passed": 6,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Instruments",
+          "total": 5,
+          "passed": 5,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Jewelry",
+          "total": 6,
+          "passed": 6,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Knives",
+          "total": 3,
+          "passed": 3,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Lighting",
+          "total": 6,
+          "passed": 6,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Pens",
+          "total": 6,
+          "passed": 6,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Retail arbitrage",
+          "total": 6,
+          "passed": 6,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Sports cards",
+          "total": 5,
+          "passed": 5,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Tools",
+          "total": 6,
+          "passed": 6,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Toys",
+          "total": 6,
+          "passed": 6,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Vases and pottery",
+          "total": 6,
+          "passed": 6,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Vintage audio",
+          "total": 6,
+          "passed": 6,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        },
+        {
+          "category": "Watches",
+          "total": 6,
+          "passed": 6,
+          "coverage": 100,
+          "decisionCoverage": 100,
+          "evidenceCoverage": 100,
+          "failures": []
+        }
+      ],
+      "updatedAt": "2026-06-27T15:15:07.411Z"
+    }
+  }
+}

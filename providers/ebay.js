@@ -63,14 +63,18 @@ function buildSearchQuery({ item, category }) {
 
 function categoryHints(category) {
   const map = {
-    Watches: ["watch", "wristwatch", "reference", "dial", "bracelet"],
+    Watches: ["watch", "wristwatch", "reference"],
     Books: ["book", "edition", "dust jacket", "printing", "hardcover"],
     Pens: ["pen", "fountain pen", "rollerball", "nib"],
     "Vintage audio": ["receiver", "amplifier", "stereo", "turntable", "speaker"],
     Knives: ["knife", "folding knife", "fixed blade"],
     Instruments: ["guitar", "amp", "instrument", "pedal", "synth"],
     "Retail arbitrage": ["new", "sealed", "sku", "discontinued"],
-    Tools: ["ratchet", "wrench", "socket", "drive", "craftsman", "snap-on", "matco"]
+    Tools: ["ratchet", "wrench", "socket", "drive", "craftsman", "snap-on", "matco"],
+    "Sports cards": ["card", "rookie", "psa", "sgc", "bgs", "topps", "panini", "bowman", "prizm"],
+    Lighting: ["lamp", "lighting", "shade", "sconce", "chandelier", "table lamp", "floor lamp"],
+    Furniture: ["table", "chair", "dresser", "desk", "cabinet", "teak", "walnut", "mid century"],
+    Toys: ["toy", "lego", "set", "doll", "figure", "hot wheels", "funko", "complete"]
   };
 
   return map[category] || [];
@@ -91,12 +95,14 @@ function escapeRegExp(value) {
 function filterReason(title, queryTokens) {
   const lower = String(title || "").toLowerCase();
   const blockedPatterns = [
-    [/for parts|parts only|\bparts\b|broken|not working|repair/, "Parts or repair listing"],
-    [/reproduction|replica|fake|counterfeit/, "Reproduction or authenticity risk"],
+    [/for parts|parts only|\bparts\b|broken|not working|repair|spares\/repairs|needs service|sold as is|\bas is\b|partial(?:ly)? tested|partial test|powers on only|works\/read|\(\s*read\s*\)|\bread description\b|pieces come apart|comes apart/, "Parts, repair, or disclosed-issue listing"],
+    [/\b(chipped|big chip|chip\b|crack|cracked|damaged|broken)\b/, "Damaged listing"],
+    [/reproduction|replica|fake|counterfeit|facsimile/, "Reproduction or authenticity risk"],
     [/bundle|lot of|job lot/, "Bundle or lot listing"],
     [/print ad|\bad\b/, "Ad or paper ephemera"],
-    [/replacement|filler cup|diaphragm|refill|converter|cartridge|pellet|bushing|\bjewel\b|\bcup\b|\bcups\b/, "Component or refill"],
-    [/cap only|nib only|caseback|\bdial\b|\bdials\b|\bhands\b|bracelet link/, "Item part, not full item"],
+    [/replacement|filler cup|diaphragm|refill|converter|cartridge|pellet|bushing|\bjewel\b|\bcup\b|\bcups\b|nib unit|\bfeed\b/, "Component or refill"],
+    [/^for .*?(strap|bracelet|clasp|band)|strap for|hanging strap|magnetic hanging strap|^(?:meter\s+)?leads?\b|test probe set|probes?\s+fit|leads?\s+(?:for|fit)|cap only|nib only|case\s*back|caseback|watch case|case part|case only|watch bracelet|\b\d{1,2}mm\s+bracelet\b|mesh strap|rubber\s+(?:band|strap)|watch\s+(?:band|strap)|dial only|\bdial\s*(?:for|part|replacement)\b|hands only|\bhands\s*(?:for|part|replacement)\b|watch crown|crown only|bracelet link|servicing|pressure test/, "Item part, not full item"],
+    [/no pen|without pen|missing pen|no ear\s*pads?|without ear\s*pads?|missing ear\s*pads?|charging cradle|cradle only|headphones?\s*-\s*case\s*-/, "Incomplete or accessory listing"],
     [/handle sleeve|\bsleeve\b|protector|pot holder/, "Accessory listing"]
   ];
 
@@ -194,10 +200,6 @@ async function searchEbay({ item, category, limit = 20 }) {
     q: query,
     limit: String(isRatchetSearch ? Math.max(limit, 50) : limit)
   });
-
-  if (!isRatchetSearch) {
-    params.set("sort", "price");
-  }
 
   const response = await fetch(`${API_BASE}/buy/browse/v1/item_summary/search?${params.toString()}`, {
     headers: {

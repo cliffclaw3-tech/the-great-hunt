@@ -27,7 +27,7 @@
           <p class="eyebrow">Tester access</p>
           <h1>Enter your beta code.</h1>
           <p class="beta-gate-copy">This keeps the June beta private while we tune the hunt, comps, and saved-find workflow.</p>
-          <p class="beta-gate-copy">By testing, you agree to treat prices as estimates, keep screenshots private, and avoid sharing photos or seller details outside the beta group.</p>
+          <p class="beta-gate-copy">By testing, you agree to treat prices as estimates, keep screenshots private, and avoid sharing photos or seller details outside the beta group. Searches, result quality, and feedback are logged to improve the beta; raw photos are not stored in the activity log.</p>
         </div>
         <label>
           Access code
@@ -55,9 +55,11 @@
           <button class="nav-tab" data-view="queue" type="button">Queue</button>
           <button class="nav-tab" data-view="protocols" type="button">Protocols</button>
           <button class="nav-tab" data-view="contest" type="button">Contest</button>
+          <a class="nav-tab nav-link" href="/agent/">Agent</a>
         </nav>
 
         <a class="setup-shortcut" href="/setup.html">API setup</a>
+        <a class="setup-shortcut" href="/beta-log.html">Beta log</a>
 
         <section class="threshold-panel" aria-label="Thresholds" data-tour="filters">
           <div class="panel-heading">
@@ -117,6 +119,21 @@
           <span><strong>6:30</strong> refresh</span>
         </div>
 
+        <section class="wes-standard" aria-label="Wes standard">
+          <div>
+            <p class="eyebrow">Wes standard</p>
+            <h2>No fake confidence.</h2>
+            <p>The app either gives a market-backed value, sends you into research mode, or tells you to skip. Parts, replicas, vague items, and weak comps should not pretend to be treasure.</p>
+          </div>
+          <div class="standard-pill-row" aria-label="Trust rules">
+            <span>Value</span>
+            <span>Research</span>
+            <span>Skip</span>
+          </div>
+        </section>
+
+        <div id="callbackPrompt" class="callback-prompt" aria-live="polite" hidden></div>
+
         <section class="mobile-view-actions" aria-label="Quick views" data-tour="views">
           <button class="nav-tab is-active" data-view="feed" type="button">Feed</button>
           <button class="nav-tab" data-view="radar" type="button">Radar</button>
@@ -124,6 +141,7 @@
           <button class="nav-tab" data-view="queue" type="button">Queue</button>
           <button class="nav-tab" data-view="protocols" type="button">Protocols</button>
           <button class="nav-tab" data-view="contest" type="button">Contest</button>
+          <a class="nav-tab nav-link" href="/agent/">Agent</a>
           <button class="nav-tab filter-toggle" id="mobileFilterToggle" type="button" aria-expanded="false">Filters</button>
           <button class="big-intent-button" data-start-camera type="button">
             <strong>Take picture</strong>
@@ -265,6 +283,9 @@
                     <option>Art and paintings</option>
                     <option>Vases and pottery</option>
                     <option>Jewelry</option>
+                    <option>Lighting</option>
+                    <option>Furniture</option>
+                    <option>Toys</option>
                   </select>
                 </label>
                 <label>
@@ -370,11 +391,29 @@
               <div>
                 <div class="section-title compact">
                   <div>
+                    <p class="eyebrow">Guided beta run</p>
+                    <h2>Test Run</h2>
+                  </div>
+                </div>
+                <div id="testRunPanel" class="test-run-panel" aria-live="polite"></div>
+              </div>
+              <div>
+                <div class="section-title compact">
+                  <div>
                     <p class="eyebrow">Launch readiness</p>
                     <h2>Beta checklist</h2>
                   </div>
                 </div>
                 <div id="readinessPanel" class="readiness-grid" aria-live="polite"></div>
+              </div>
+              <div>
+                <div class="section-title compact">
+                  <div>
+                    <p class="eyebrow">Valuation coverage</p>
+                    <h2>90% tracker</h2>
+                  </div>
+                </div>
+                <div id="valuationScoreboard" class="valuation-scoreboard" aria-live="polite"></div>
               </div>
               <div>
                 <div class="section-title compact">
@@ -420,20 +459,45 @@
         <section id="contestView" class="view">
           <div class="section-title">
             <div>
-              <p class="eyebrow">Phase 2</p>
-              <h2>Weekend warrior challenge</h2>
+              <p class="eyebrow">30-day paper test</p>
+              <h2>$500 Paper Trade Lab</h2>
+              <p class="section-help">Use saved finds as the agent's simulated deal pipeline, then track paper buys, paper listings, paper sales, risk, and the path to $5,000.</p>
             </div>
           </div>
-          <div class="contest-board">
-            <div class="contest-summary">
-              <span class="pill">30 days</span>
-              <h3>$1k challenge</h3>
-              <p>Track starting stake, miles, receipts, sale proceeds, and verified profit without revealing your best hunting grounds by default.</p>
+          <div class="challenge-layout">
+            <form id="challengeSettingsForm" class="tool-panel">
+              <div>
+                <p class="eyebrow">Test rules</p>
+                <h3>Simulated bankroll</h3>
+              </div>
+              <label>
+                Starting paper cash
+                <input id="challengeBankroll" type="number" min="0" step="1" value="500">
+              </label>
+              <label>
+                Target result
+                <input id="challengeGoal" type="number" min="0" step="1" value="5000">
+              </label>
+              <label>
+                Days
+                <input id="challengeDays" type="number" min="1" step="1" value="30">
+              </label>
+              <button type="submit">Save Challenge Rules</button>
+              <button class="secondary-action" data-reset-challenge type="button">Reset Ledger</button>
+              <p class="small-note">No real money changes hands. Saved finds become the queue, and simulated buys/listings/sales test whether the app's judgment would have held up.</p>
+            </form>
+            <div class="challenge-stack">
+              <div id="challengeDashboard" class="challenge-dashboard" aria-live="polite"></div>
+              <div id="paperTradeSummary" class="paper-trade-summary" aria-live="polite"></div>
+              <div id="challengeQueue" class="challenge-grid" aria-live="polite"></div>
+              <div id="challengeReport" class="challenge-report" aria-live="polite"></div>
             </div>
-            <ol id="leaderboard" class="leaderboard"></ol>
           </div>
         </section>
       </main>
+      <footer class="maker-mark" aria-label="Maker">
+        <span>A Shields Enterprises Solution</span>
+      </footer>
     </div>
 
     <script src="app.js"></script>

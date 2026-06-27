@@ -27,7 +27,7 @@
             <div>
               <p class="eyebrow">Comp sources</p>
               <h1>Connect eBay</h1>
-              <p>Used for active marketplace comps now, and sold comps when eBay approves Marketplace Insights.</p>
+              <p>Used for active marketplace comps. Sold comps can now run through SoldComps instead of waiting on eBay approval.</p>
             </div>
 
             <label>
@@ -49,6 +49,38 @@
             </label>
 
             <button class="primary-action" type="submit">Save eBay keys</button>
+          </form>
+
+          <form id="soldCompsSetupForm" class="tool-panel setup-form">
+            <div>
+              <p class="eyebrow">Sold prices</p>
+              <h1>Connect SoldComps</h1>
+              <p>Used for real eBay sold-price comps, including sold price, shipping, condition, and sale date.</p>
+              <a class="secondary-link" href="https://sold-comps.com/" target="_blank" rel="noopener noreferrer">Create SoldComps key</a>
+            </div>
+
+            <label>
+              SoldComps API key
+              <input id="soldCompsApiKey" name="soldCompsApiKey" autocomplete="off" placeholder="Paste key starting with sc_" required />
+            </label>
+
+            <button class="primary-action" type="submit">Save SoldComps key</button>
+          </form>
+
+          <form id="priceChartingSetupForm" class="tool-panel setup-form">
+            <div>
+              <p class="eyebrow">Catalog values</p>
+              <h1>Connect PriceCharting</h1>
+              <p>Used for structured values on sports cards, comics, coins, games, LEGO, Funko, and other catalog-style collectibles.</p>
+              <a class="secondary-link" href="https://www.pricecharting.com/api-documentation" target="_blank" rel="noopener noreferrer">Get PriceCharting API access</a>
+            </div>
+
+            <label>
+              PriceCharting token
+              <input id="priceChartingToken" name="priceChartingToken" autocomplete="off" placeholder="Paste PriceCharting token" required />
+            </label>
+
+            <button class="primary-action" type="submit">Save PriceCharting token</button>
           </form>
 
           <form id="openAiSetupForm" class="tool-panel setup-form">
@@ -82,6 +114,8 @@
       const status = document.querySelector("#setupStatus");
       const betaAccessKey = "great-hunt-beta-code";
       const ebayForm = document.querySelector("#ebaySetupForm");
+      const soldCompsForm = document.querySelector("#soldCompsSetupForm");
+      const priceChartingForm = document.querySelector("#priceChartingSetupForm");
       const openAiForm = document.querySelector("#openAiSetupForm");
 
       function authHeaders() {
@@ -94,9 +128,11 @@
 
       function describe(data) {
         const ebay = data.ebayClientId && data.ebayClientSecret ? "eBay keys saved" : "eBay keys not saved yet";
+        const soldComps = data.soldComps ? "SoldComps key saved" : "SoldComps key missing";
+        const priceCharting = data.priceCharting ? "PriceCharting token saved" : "PriceCharting token missing";
         const reverb = data.reverbToken ? "Reverb token saved" : "Reverb token missing";
         const vision = data.openAiVision ? "Vision key saved" : "Vision key missing";
-        return `${ebay}. ${reverb}. ${vision}. Environment: ${data.ebayEnv || "production"}.`;
+        return `${ebay}. ${soldComps}. ${priceCharting}. ${reverb}. ${vision}. Environment: ${data.ebayEnv || "production"}.`;
       }
 
       async function refreshStatus() {
@@ -120,6 +156,36 @@
         const data = await response.json();
         ebayForm.clientId.value = "";
         ebayForm.clientSecret.value = "";
+        status.textContent = describe(data);
+      });
+
+      soldCompsForm.addEventListener("submit", async event => {
+        event.preventDefault();
+        status.textContent = "Saving SoldComps key locally...";
+        const response = await fetch("/api/config/soldcomps", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            apiKey: soldCompsForm.soldCompsApiKey.value
+          })
+        });
+        const data = await response.json();
+        soldCompsForm.soldCompsApiKey.value = "";
+        status.textContent = describe(data);
+      });
+
+      priceChartingForm.addEventListener("submit", async event => {
+        event.preventDefault();
+        status.textContent = "Saving PriceCharting token locally...";
+        const response = await fetch("/api/config/pricecharting", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            apiKey: priceChartingForm.priceChartingToken.value
+          })
+        });
+        const data = await response.json();
+        priceChartingForm.priceChartingToken.value = "";
         status.textContent = describe(data);
       });
 

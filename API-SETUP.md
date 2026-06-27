@@ -29,6 +29,7 @@ EBAY_CLIENT_ID=your-real-client-id
 EBAY_CLIENT_SECRET=your-real-client-secret
 EBAY_ENV=production
 EBAY_ENABLE_MARKETPLACE_INSIGHTS=false
+SOLD_COMPS_API_KEY=your-soldcomps-api-key
 REVERB_TOKEN=your-real-reverb-token
 OPENAI_API_KEY=your-openai-api-key
 OPENAI_VISION_MODEL=gpt-4.1-mini
@@ -91,7 +92,8 @@ For local development, it is normal for **Public beta URL** and **Sold comps** t
 
 ## What to expect
 - If eBay credentials are present and valid, the lookup tool will use live eBay Browse API search results.
-- If eBay grants Marketplace Insights access, set `EBAY_ENABLE_MARKETPLACE_INSIGHTS=true` to try eBay sold-comps before active listings.
+- If `SOLD_COMPS_API_KEY` is present, the lookup tool tries real eBay sold-comps through SoldComps before active eBay listings.
+- If eBay grants Marketplace Insights access later, set `EBAY_ENABLE_MARKETPLACE_INSIGHTS=true` as a secondary sold-comps path.
 - If `REVERB_TOKEN` is present and the category is Vintage audio or Instruments, the lookup tool tries Reverb first.
 - Photo assessment is wired into the app for beta testing. A vision model key will be needed before the app can identify an object from the photo alone.
 - Radar can use Crawl4AI for smarter estate-sale, auction, and classifieds page scans when Crawl4AI is installed. If it is not installed, Radar falls back to the basic scanner.
@@ -170,8 +172,29 @@ Once enabled, the intended flow is:
    - `read_listings`
 7. Add the token to `.env` as `REVERB_TOKEN=...`
 
+## SoldComps setup
+SoldComps is the practical replacement for eBay Marketplace Insights while eBay sold-comps access is restricted.
+
+1. Go to https://sold-comps.com/
+2. Create a free account
+3. Copy the API key that starts with `sc_`
+4. Open `http://127.0.0.1:4173/setup.html`
+5. Paste the key into **Connect SoldComps**
+
+Or add it directly to `.env`:
+
+```env
+SOLD_COMPS_API_KEY=sc_your_key_here
+```
+
+Current flow:
+1. User enters or identifies an item
+2. The app tries SoldComps for sold-price data
+3. If sold comps are unavailable, the app tries Reverb for instruments/audio or active eBay Browse comps
+4. If live sources are unavailable, the app falls back to local estimate wording
+
 ## eBay sold-comps setup
-eBay sold comps require Marketplace Insights API access. This is a limited-release API, so normal Browse API keys may not be enough.
+eBay sold comps through eBay itself require Marketplace Insights API access. This is a limited-release API, so normal Browse API keys may not be enough. SoldComps is now the primary sold-comps route.
 
 Request access for:
 - API: Marketplace Insights API
