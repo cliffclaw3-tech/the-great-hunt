@@ -238,6 +238,7 @@ const testRunKey = "great-hunt-test-run-v1";
 const challengeStateKey = "great-hunt-challenge-v1";
 const callbackStateKey = "great-hunt-callback-state-v1";
 const betaAccessKey = "great-hunt-beta-code";
+const betaTesterKey = "great-hunt-beta-tester";
 const tourSeenKey = "great-hunt-tour-seen";
 const betaStatuses = [
   ["interested", "Interested"],
@@ -3001,10 +3002,21 @@ async function checkBetaAccess() {
 
 async function submitBetaAccess(event) {
   event.preventDefault();
+  const nameInput = document.querySelector("#betaTesterName");
+  const emailInput = document.querySelector("#betaTesterEmail");
+  const focusInput = document.querySelector("#betaTesterFocus");
   const input = document.querySelector("#betaAccessCode");
-  const agreement = document.querySelector("#betaAgreement");
+  const agreement = document.querySelector("#betaAgreementAccepted");
   const message = document.querySelector("#betaGateMessage");
+  const name = nameInput.value.trim();
+  const email = emailInput.value.trim();
+  const focus = focusInput.value.trim();
   const code = input.value.trim();
+
+  if (!name || !email) {
+    message.textContent = "Enter your name and email so Wes knows who is testing.";
+    return;
+  }
 
   if (!code) {
     message.textContent = "Enter the beta code Wes gave you.";
@@ -3012,32 +3024,49 @@ async function submitBetaAccess(event) {
   }
 
   if (!agreement.checked) {
-    message.textContent = "Accept the beta agreement before unlocking the app.";
+    message.textContent = "Accept the private beta agreement to continue.";
     return;
   }
 
-  message.textContent = "Checking code...";
+  message.textContent = "Creating beta access...";
 
   try {
-    const response = await fetch("/api/beta/access", {
+    const response = await fetch("/api/beta/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, agreementAccepted: agreement.checked })
+      body: JSON.stringify({
+        name,
+        email,
+        focus,
+        code,
+        agreementAccepted: agreement.checked,
+        source: "beta gate"
+      })
     });
     const result = await response.json();
 
     if (!response.ok || !result.accepted) {
-      message.textContent = "That code did not work. Check the spelling and try again.";
+      message.textContent = result.error || "That signup did not work. Check the code and try again.";
       return;
     }
 
     localStorage.setItem(betaAccessKey, code);
+    localStorage.setItem(betaTesterKey, JSON.stringify(result.tester || { name, email, focus }));
+    logActivityEvent({
+      type: "beta-access-unlocked",
+      source: "beta gate",
+      message: `${name} unlocked The Great Hunt beta`,
+      success: true
+    });
+    nameInput.value = "";
+    emailInput.value = "";
+    focusInput.value = "";
     input.value = "";
     agreement.checked = false;
     setAppLocked(false);
     initApp();
   } catch {
-    message.textContent = "Could not check the code. Try again in a moment.";
+    message.textContent = "Could not create beta access. Try again in a moment.";
   }
 }
 

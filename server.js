@@ -13,6 +13,7 @@ const { lookupProductByBarcode, hasProductLookupConfig } = require("./providers/
 const root = __dirname;
 const dataPath = path.join(root, "data", "watchlists.json");
 const findsPath = path.join(root, "data", "finds.json");
+const betaTestersPath = path.join(root, "data", "beta-testers.json");
 const photoEventsPath = path.join(root, "data", "photo-events.json");
 const activityEventsPath = path.join(root, "data", "activity-events.json");
 const betaScoutPath = path.join(root, "data", "beta-scout.json");
@@ -22,6 +23,7 @@ const port = Number(process.env.PORT || 4173);
 const host = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
 let pgPool = null;
 let activityTableReady = false;
+let betaTestersTableReady = false;
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -2334,6 +2336,84 @@ async function writeFinds(finds) {
   await fs.writeFile(findsPath, `${JSON.stringify(finds, null, 2)}\n`);
 }
 
+async function readBetaTesters() {
+  if (hasActivityDatabase()) {
+    try {
+      await ensureBetaTestersTable();
+      const result = await activityPool().query("SELECT * FROM beta_testers ORDER BY last_seen_at DESC LIMIT 500");
+      return result.rows.map(row => ({
+        id: row.id,
+        name: row.name || "",
+        email: row.email || "",
+        focus: row.focus || "",
+        status: row.status || "accepted",
+        agreementAccepted: Boolean(row.agreement_accepted),
+        agreementVersion: row.agreement_version || "private-beta-v1",
+        joinedAt: row.joined_at instanceof Date ? row.joined_at.toISOString() : String(row.joined_at || ""),
+        lastSeenAt: row.last_seen_at instanceof Date ? row.last_seen_at.toISOString() : String(row.last_seen_at || ""),
+        source: row.source || "",
+        userAgent: row.user_agent || ""
+      }));
+    } catch (error) {
+      console.warn(`Postgres beta tester read failed: ${error.message}`);
+    }
+  }
+
+  try {
+    const file = await fs.readFile(betaTestersPath, "utf8");
+    return JSON.parse(file);
+  } catch {
+    return [];
+  }
+}
+
+async function writeBetaTesters(testers) {
+  if (hasActivityDatabase()) {
+    try {
+      await ensureBetaTestersTable();
+      const pool = activityPool();
+      for (const tester of testers) {
+        await pool.query(`
+          INSERT INTO beta_testers (
+            id, name, email, focus, status, agreement_accepted, agreement_version,
+            joined_at, last_seen_at, source, user_agent
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7,
+            $8, $9, $10, $11
+          )
+          ON CONFLICT (email) DO UPDATE SET
+            name = EXCLUDED.name,
+            focus = EXCLUDED.focus,
+            status = EXCLUDED.status,
+            agreement_accepted = EXCLUDED.agreement_accepted,
+            agreement_version = EXCLUDED.agreement_version,
+            last_seen_at = EXCLUDED.last_seen_at,
+            source = EXCLUDED.source,
+            user_agent = EXCLUDED.user_agent;
+        `, [
+          tester.id,
+          tester.name,
+          tester.email,
+          tester.focus,
+          tester.status,
+          Boolean(tester.agreementAccepted),
+          tester.agreementVersion || "private-beta-v1",
+          tester.joinedAt || new Date().toISOString(),
+          tester.lastSeenAt || new Date().toISOString(),
+          tester.source || "",
+          tester.userAgent || ""
+        ]);
+      }
+      return;
+    } catch (error) {
+      console.warn(`Postgres beta tester write failed: ${error.message}`);
+    }
+  }
+
+  await fs.mkdir(path.dirname(betaTestersPath), { recursive: true });
+  await fs.writeFile(betaTestersPath, `${JSON.stringify(testers, null, 2)}\n`);
+}
+
 async function readPhotoEvents() {
   try {
     const file = await fs.readFile(photoEventsPath, "utf8");
@@ -2496,6 +2576,30 @@ async function ensureActivityTable() {
   await pool.query("ALTER TABLE activity_events ADD COLUMN IF NOT EXISTS tester_code TEXT;");
   await pool.query("CREATE INDEX IF NOT EXISTS activity_events_at_idx ON activity_events (at DESC);");
   activityTableReady = true;
+  return true;
+}
+
+async function ensureBetaTestersTable() {
+  const pool = activityPool();
+  if (!pool || betaTestersTableReady) return Boolean(pool);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS beta_testers (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      focus TEXT,
+      status TEXT NOT NULL DEFAULT 'accepted',
+      agreement_accepted BOOLEAN NOT NULL DEFAULT false,
+      agreement_version TEXT,
+      joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      source TEXT,
+      user_agent TEXT
+    );
+  `);
+  await pool.query("CREATE INDEX IF NOT EXISTS beta_testers_last_seen_idx ON beta_testers (last_seen_at DESC);");
+  betaTestersTableReady = true;
   return true;
 }
 
@@ -2935,11 +3039,94 @@ async function betaScoutSummary() {
   };
 }
 
+function publicTesterRecord(record) {
+  return {
+    id: record.id,
+    name: record.name,
+    email: record.email,
+    focus: record.focus,
+    status: record.status,
+    joinedAt: record.joinedAt,
+    lastSeenAt: record.lastSeenAt
+  };
+}
+
+async function createBetaTester(body, request) {
+  const submittedCode = betaScoutCode(body.code);
+  const configuredCode = betaAccessCode();
+  const invite = await findBetaScoutInvite(submittedCode);
+  const codeAccepted = Boolean(invite) || !configuredCode || submittedCode === betaScoutCode(configuredCode);
+  if (!codeAccepted) {
+    return { status: 401, payload: { accepted: false, error: "That beta code did not work." } };
+  }
+
+  const name = shortText(body.name, 80);
+  const email = shortText(body.email, 120).toLowerCase();
+  const focus = shortText(body.focus, 160);
+  const agreementAccepted = Boolean(body.agreementAccepted);
+  if (!name || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { status: 400, payload: { accepted: false, error: "Name and valid email are required." } };
+  }
+  if (!agreementAccepted) {
+    return { status: 400, payload: { accepted: false, error: "Beta agreement must be accepted." } };
+  }
+
+  const testers = await readBetaTesters();
+  const now = new Date().toISOString();
+  const existingIndex = testers.findIndex(tester => String(tester.email || "").toLowerCase() === email);
+  const base = existingIndex >= 0 ? testers[existingIndex] : {};
+  const tester = {
+    ...base,
+    id: base.id || `tester-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    name,
+    email,
+    focus,
+    status: base.status || "accepted",
+    agreementAccepted: true,
+    agreementVersion: "private-beta-v1",
+    joinedAt: base.joinedAt || now,
+    lastSeenAt: now,
+    source: shortText(body.source, 80) || "beta gate",
+    userAgent: shortText(request.headers["user-agent"], 240)
+  };
+
+  if (existingIndex >= 0) testers[existingIndex] = tester;
+  else testers.unshift(tester);
+  await writeBetaTesters(testers.slice(0, 500));
+  if (invite) {
+    await markBetaScoutTester(submittedCode, {
+      name,
+      email,
+      signedUpAt: invite.signedUpAt || now,
+      agreementAcceptedAt: invite.agreementAcceptedAt || now,
+      lastOpenedAt: now
+    });
+  }
+  await writeActivityEvent({
+    type: existingIndex >= 0 ? "beta-tester-returned" : "beta-tester-signup",
+    source: "beta gate",
+    message: `${name} joined the private beta`,
+    testerCode: invite ? submittedCode : "",
+    status: tester.status,
+    success: true
+  });
+
+  return {
+    status: 201,
+    payload: {
+      accepted: true,
+      enabled: Boolean(betaAccessCode()),
+      tester: publicTesterRecord(tester)
+    }
+  };
+}
+
 async function healthStatus(request) {
   const values = await readEnvValues();
   const config = configStatus(values);
   const finds = await readFinds();
   const betaScout = await betaScoutSummary();
+  const testers = await readBetaTesters();
   const crawl4AiReady = await hasCrawl4Ai();
   const publicUrl = config.publicUrl || "";
   const requestHost = String(request.headers.host || "");
@@ -2954,7 +3141,8 @@ async function healthStatus(request) {
     { label: "Sold comps", ok: config.soldComps || config.ebayMarketplaceInsights, detail: config.soldComps ? "SoldComps API key is configured." : config.ebayMarketplaceInsights ? "Marketplace Insights is enabled." : "Add a SoldComps key or wait for eBay Marketplace Insights approval." },
     { label: "Public URL", ok: Boolean(publicUrl) || !runningLocal, detail: publicUrl || (runningLocal ? "Running locally; deploy before outside beta." : `Running on ${requestHost}.`) },
     { label: "Beta Scout", ok: true, detail: `beta-scout=true; ${betaScout.totals.invited} tester invite${betaScout.totals.invited === 1 ? "" : "s"} tracked.` },
-    { label: "Tester examples", ok: finds.length >= 5, detail: `${finds.length} saved find${finds.length === 1 ? "" : "s"} recorded.` }
+    { label: "Beta signups", ok: testers.length >= 1, detail: `${testers.length} beta tester${testers.length === 1 ? "" : "s"} signed up.` },
+    { label: "Tester examples", ok: finds.length >= 5, detail: `${finds.length} saved find${finds.length === 1 ? "" : "s"} recorded.` },
   ];
 
   return {
@@ -3412,6 +3600,12 @@ const server = http.createServer(async (request, response) => {
         betaScout: Boolean(invite),
         tester: invite ? { code: invite.code, name: invite.name } : null
       });
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/beta/signup") {
+      const result = await createBetaTester(await readJsonBody(request), request);
+      sendJson(response, result.status, result.payload);
       return;
     }
 

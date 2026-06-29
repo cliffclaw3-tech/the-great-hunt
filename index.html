@@ -25,19 +25,33 @@
         </div>
         <div>
           <p class="eyebrow">Tester access</p>
-          <h1>Enter your beta code.</h1>
-          <p class="beta-gate-copy">This keeps the June beta private while we tune the hunt, comps, and saved-find workflow.</p>
-          <p class="beta-gate-copy">By testing, you agree to treat prices as estimates, keep screenshots private, and avoid sharing photos or seller details outside the beta group. Searches, result quality, and feedback are logged to improve the beta; raw photos are not stored in the activity log.</p>
+          <h1>Join the private beta.</h1>
+          <p class="beta-gate-copy">This keeps the beta private while we tune the hunt, comps, and saved-find workflow with real testers.</p>
+          <p class="beta-gate-copy">The Great Hunt gives research estimates, not guaranteed resale prices, appraisals, or profit.</p>
+        </div>
+        <div class="form-pair">
+          <label>
+            Your name
+            <input id="betaTesterName" type="text" autocomplete="name" placeholder="John Doe" required />
+          </label>
+          <label>
+            Email
+            <input id="betaTesterEmail" type="email" autocomplete="email" placeholder="you@example.com" required />
+          </label>
         </div>
         <label>
+          What do you hunt for?
+          <input id="betaTesterFocus" type="text" placeholder="Garage sales, cards, tools, watches..." />
+        </label>
+        <label>
           Access code
-          <input id="betaAccessCode" type="password" autocomplete="one-time-code" placeholder="Ask Wes for the code" />
+          <input id="betaAccessCode" type="password" autocomplete="one-time-code" placeholder="Ask Wes for the code" required />
         </label>
         <label class="beta-agreement-check">
-          <input id="betaAgreement" type="checkbox" required />
-          <span>I agree to keep beta material private, treat prices as estimates, and let The Great Hunt log searches, result quality, saved finds, and feedback for beta improvement.</span>
+          <input id="betaAgreementAccepted" type="checkbox" required />
+          <span>I agree to keep beta access, private links, screenshots, pricing, and unreleased features confidential until public launch. I understand values are estimates, not guarantees, and I am responsible for my own buying, selling, shipping, taxes, safety, and marketplace decisions.</span>
         </label>
-        <button class="primary-action" type="submit">Unlock The Great Hunt</button>
+        <button class="primary-action" type="submit">Join Beta</button>
         <p id="betaGateMessage" class="beta-gate-message" role="status"></p>
       </form>
     </section>
