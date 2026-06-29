@@ -15,6 +15,7 @@ const dataPath = path.join(root, "data", "watchlists.json");
 const findsPath = path.join(root, "data", "finds.json");
 const photoEventsPath = path.join(root, "data", "photo-events.json");
 const activityEventsPath = path.join(root, "data", "activity-events.json");
+const betaScoutPath = path.join(root, "data", "beta-scout.json");
 const reliabilityReportPath = path.join(root, "data", "reliability-report.json");
 const envPath = path.join(root, ".env");
 const port = Number(process.env.PORT || 4173);
@@ -2355,6 +2356,80 @@ function shortText(value, max = 240) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
+function betaScoutCode(value) {
+  return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 32);
+}
+
+function betaScoutInviteDefaults(invite = {}) {
+  const code = betaScoutCode(invite.code);
+  return {
+    id: String(invite.id || code || Date.now()),
+    code,
+    name: shortText(invite.name, 80) || "Unnamed tester",
+    email: shortText(invite.email, 120),
+    notes: shortText(invite.notes, 500),
+    active: invite.active !== false,
+    createdAt: invite.createdAt || new Date().toISOString(),
+    signedUpAt: invite.signedUpAt || "",
+    agreementAcceptedAt: invite.agreementAcceptedAt || "",
+    lastOpenedAt: invite.lastOpenedAt || ""
+  };
+}
+
+async function readBetaScout() {
+  try {
+    const file = await fs.readFile(betaScoutPath, "utf8");
+    const parsed = JSON.parse(file);
+    return {
+      testers: Array.isArray(parsed.testers) ? parsed.testers.map(betaScoutInviteDefaults).filter(tester => tester.code) : []
+    };
+  } catch {
+    return { testers: [] };
+  }
+}
+
+async function writeBetaScout(state) {
+  await fs.mkdir(path.dirname(betaScoutPath), { recursive: true });
+  await fs.writeFile(betaScoutPath, `${JSON.stringify({
+    testers: (state.testers || []).map(betaScoutInviteDefaults).filter(tester => tester.code)
+  }, null, 2)}\n`);
+}
+
+async function findBetaScoutInvite(code) {
+  const normalizedCode = betaScoutCode(code);
+  if (!normalizedCode) return null;
+  const state = await readBetaScout();
+  return state.testers.find(tester => tester.active && tester.code === normalizedCode) || null;
+}
+
+async function upsertBetaScoutTester(body) {
+  const state = await readBetaScout();
+  const code = betaScoutCode(body.code) || betaScoutCode(`GH-${Math.random().toString(36).slice(2, 8)}`);
+  const existingIndex = state.testers.findIndex(tester => tester.code === code);
+  const next = betaScoutInviteDefaults({
+    ...(existingIndex >= 0 ? state.testers[existingIndex] : {}),
+    ...body,
+    code,
+    active: body.active === undefined ? true : Boolean(body.active)
+  });
+
+  if (existingIndex >= 0) state.testers[existingIndex] = next;
+  else state.testers.unshift(next);
+  await writeBetaScout(state);
+  return next;
+}
+
+async function markBetaScoutTester(code, patch) {
+  const normalizedCode = betaScoutCode(code);
+  if (!normalizedCode) return null;
+  const state = await readBetaScout();
+  const index = state.testers.findIndex(tester => tester.code === normalizedCode);
+  if (index === -1) return null;
+  state.testers[index] = betaScoutInviteDefaults({ ...state.testers[index], ...patch });
+  await writeBetaScout(state);
+  return state.testers[index];
+}
+
 function databaseUrl() {
   return String(process.env.DATABASE_URL || process.env.POSTGRES_URL || "").trim();
 }
@@ -2409,6 +2484,7 @@ async function ensureActivityTable() {
       valuation_status TEXT,
       valuation_method TEXT,
       feedback TEXT,
+      tester_code TEXT,
       status TEXT,
       message TEXT,
       success BOOLEAN,
@@ -2417,6 +2493,7 @@ async function ensureActivityTable() {
   `);
   await pool.query("ALTER TABLE activity_events ADD COLUMN IF NOT EXISTS valuation_status TEXT;");
   await pool.query("ALTER TABLE activity_events ADD COLUMN IF NOT EXISTS valuation_method TEXT;");
+  await pool.query("ALTER TABLE activity_events ADD COLUMN IF NOT EXISTS tester_code TEXT;");
   await pool.query("CREATE INDEX IF NOT EXISTS activity_events_at_idx ON activity_events (at DESC);");
   activityTableReady = true;
   return true;
@@ -2443,6 +2520,7 @@ function normalizeDbActivityEvent(row) {
     valuationStatus: row.valuation_status || "",
     valuationMethod: row.valuation_method || "",
     feedback: row.feedback || "",
+    testerCode: row.tester_code || row.payload?.testerCode || "",
     status: row.status || "",
     message: row.message || "",
     success: row.success
@@ -2488,6 +2566,7 @@ function sanitizeActivityEvent(body) {
     valuationStatus: shortText(body.valuationStatus, 80),
     valuationMethod: shortText(body.valuationMethod, 80),
     feedback: shortText(body.feedback, 80),
+    testerCode: betaScoutCode(body.testerCode),
     status: shortText(body.status, 80),
     message: shortText(body.message),
     success: body.success === undefined ? null : Boolean(body.success)
@@ -2504,11 +2583,11 @@ async function writeActivityEvent(body) {
         INSERT INTO activity_events (
           type, at, client_at, query, category, ground, condition, ask, distance,
           has_photo, source, result_title, result_category, confidence, comps,
-          valuation_status, valuation_method, feedback, status, message, success, payload
+          valuation_status, valuation_method, feedback, tester_code, status, message, success, payload
         ) VALUES (
           $1, NOW(), $2, $3, $4, $5, $6, $7, $8,
           $9, $10, $11, $12, $13, $14,
-          $15, $16, $17, $18, $19, $20, $21
+          $15, $16, $17, $18, $19, $20, $21, $22
         )
         RETURNING *;
       `, [
@@ -2529,6 +2608,7 @@ async function writeActivityEvent(body) {
         event.valuationStatus,
         event.valuationMethod,
         event.feedback,
+        event.testerCode,
         event.status,
         event.message,
         event.success,
@@ -2802,7 +2882,56 @@ function betaAccessCode() {
 
 function betaAccessStatus() {
   return {
-    enabled: Boolean(betaAccessCode())
+    enabled: Boolean(betaAccessCode()),
+    betaScout: true,
+    agreementRequired: true
+  };
+}
+
+function testerScoreFrom({ tester, events, finds }) {
+  const testerEvents = events.filter(event => betaScoutCode(event.testerCode) === tester.code);
+  const testerFinds = finds.filter(find => betaScoutCode(find.betaTesterCode) === tester.code);
+  const opened = Boolean(tester.lastOpenedAt || testerEvents.some(event => event.type === "app-opened"));
+  const tested = testerEvents.some(event => ["lookup-result", "lookup-feedback-marked", "photo-identify"].includes(event.type));
+  const saved = testerFinds.length > 0 || testerEvents.some(event => ["save-find", "save-find-local"].includes(event.type));
+  const feedback = testerFinds.some(find => find.betaFeedback || find.betaNotes) || testerEvents.some(event => ["feedback-marked", "lookup-feedback-marked", "status-updated"].includes(event.type) && (event.feedback || event.status));
+  const signedUp = Boolean(tester.signedUpAt);
+  const points = [signedUp, opened, tested, saved, feedback].filter(Boolean).length;
+
+  return {
+    signedUp,
+    opened,
+    tested,
+    saved,
+    feedback,
+    points,
+    savedCount: testerFinds.length,
+    feedbackCount: testerFinds.filter(find => find.betaFeedback || find.betaNotes).length,
+    eventCount: testerEvents.length
+  };
+}
+
+async function betaScoutSummary() {
+  const state = await readBetaScout();
+  const events = await readActivityEvents();
+  const finds = await readFinds();
+  const testers = state.testers.map(tester => ({
+    ...tester,
+    score: testerScoreFrom({ tester, events, finds })
+  }));
+  const totals = testers.reduce((summary, tester) => {
+    for (const key of ["signedUp", "opened", "tested", "saved", "feedback"]) {
+      if (tester.score[key]) summary[key] += 1;
+    }
+    summary.points += tester.score.points;
+    return summary;
+  }, { invited: testers.length, signedUp: 0, opened: 0, tested: 0, saved: 0, feedback: 0, points: 0 });
+
+  return {
+    betaScout: true,
+    generatedAt: new Date().toISOString(),
+    totals,
+    testers
   };
 }
 
@@ -2810,6 +2939,7 @@ async function healthStatus(request) {
   const values = await readEnvValues();
   const config = configStatus(values);
   const finds = await readFinds();
+  const betaScout = await betaScoutSummary();
   const crawl4AiReady = await hasCrawl4Ai();
   const publicUrl = config.publicUrl || "";
   const requestHost = String(request.headers.host || "");
@@ -2823,6 +2953,7 @@ async function healthStatus(request) {
     { label: "Smart page scan", ok: crawl4AiReady, detail: crawl4AiReady ? "Crawl4AI is available for Radar source pages." : "Crawl4AI not installed; Radar uses the basic scanner fallback." },
     { label: "Sold comps", ok: config.soldComps || config.ebayMarketplaceInsights, detail: config.soldComps ? "SoldComps API key is configured." : config.ebayMarketplaceInsights ? "Marketplace Insights is enabled." : "Add a SoldComps key or wait for eBay Marketplace Insights approval." },
     { label: "Public URL", ok: Boolean(publicUrl) || !runningLocal, detail: publicUrl || (runningLocal ? "Running locally; deploy before outside beta." : `Running on ${requestHost}.`) },
+    { label: "Beta Scout", ok: true, detail: `beta-scout=true; ${betaScout.totals.invited} tester invite${betaScout.totals.invited === 1 ? "" : "s"} tracked.` },
     { label: "Tester examples", ok: finds.length >= 5, detail: `${finds.length} saved find${finds.length === 1 ? "" : "s"} recorded.` }
   ];
 
@@ -2834,18 +2965,21 @@ async function healthStatus(request) {
       local: runningLocal,
       publicUrl
     },
+    betaScout: true,
     checks
   };
 }
 
-function hasBetaAccess(request) {
+async function hasBetaAccess(request) {
   const code = betaAccessCode();
+  const submittedCode = betaScoutCode(request.headers["x-beta-access-code"]);
+  if (submittedCode && await findBetaScoutInvite(submittedCode)) return true;
   if (!code) return true;
-  return String(request.headers["x-beta-access-code"] || "").trim() === code;
+  return submittedCode === betaScoutCode(code);
 }
 
-function requireBetaAccess(request, response) {
-  if (hasBetaAccess(request)) return true;
+async function requireBetaAccess(request, response) {
+  if (await hasBetaAccess(request)) return true;
   sendJson(response, 401, { error: "Beta access code required" });
   return false;
 }
@@ -3248,14 +3382,50 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === "POST" && url.pathname === "/api/beta/access") {
       const body = await readJsonBody(request);
-      const submittedCode = String(body.code || "").trim();
+      const submittedCode = betaScoutCode(body.code);
       const configuredCode = betaAccessCode();
-      const accepted = !configuredCode || submittedCode.toUpperCase() === configuredCode.toUpperCase();
-      sendJson(response, accepted ? 200 : 401, { accepted, enabled: Boolean(betaAccessCode()) });
+      const invite = await findBetaScoutInvite(submittedCode);
+      const accepted = Boolean(invite) || !configuredCode || submittedCode === betaScoutCode(configuredCode);
+      const agreementAccepted = body.agreementAccepted === true;
+
+      if (!agreementAccepted) {
+        sendJson(response, 400, { accepted: false, enabled: Boolean(betaAccessCode()), error: "Beta agreement is required" });
+        return;
+      }
+
+      if (accepted && invite) {
+        await markBetaScoutTester(submittedCode, {
+          signedUpAt: invite.signedUpAt || new Date().toISOString(),
+          agreementAcceptedAt: invite.agreementAcceptedAt || new Date().toISOString()
+        });
+        await writeActivityEvent({
+          type: "beta-signup",
+          testerCode: submittedCode,
+          status: "signed-up",
+          success: true
+        });
+      }
+
+      sendJson(response, accepted ? 200 : 401, {
+        accepted,
+        enabled: Boolean(betaAccessCode()),
+        betaScout: Boolean(invite),
+        tester: invite ? { code: invite.code, name: invite.name } : null
+      });
       return;
     }
 
-    if (url.pathname.startsWith("/api/") && !requireBetaAccess(request, response)) {
+    if (url.pathname.startsWith("/api/") && !await requireBetaAccess(request, response)) {
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/beta-scout") {
+      sendJson(response, 200, await betaScoutSummary());
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/beta-scout/testers") {
+      sendJson(response, 201, await upsertBetaScoutTester(await readJsonBody(request)));
       return;
     }
 
@@ -3318,7 +3488,13 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (request.method === "POST" && url.pathname === "/api/activity") {
-      sendJson(response, 201, await writeActivityEvent(await readJsonBody(request)));
+      const body = await readJsonBody(request);
+      const testerCode = betaScoutCode(body.testerCode || request.headers["x-beta-access-code"]);
+      const event = await writeActivityEvent({ ...body, testerCode });
+      if (testerCode && body.type === "app-opened") {
+        await markBetaScoutTester(testerCode, { lastOpenedAt: new Date().toISOString() });
+      }
+      sendJson(response, 201, event);
       return;
     }
 
@@ -3395,6 +3571,7 @@ const server = http.createServer(async (request, response) => {
         explanation: String(body.explanation || ""),
         compLinks: Array.isArray(body.compLinks) ? body.compLinks.slice(0, 6) : [],
         compReview: body.compReview && typeof body.compReview === "object" ? body.compReview : null,
+        betaTesterCode: betaScoutCode(body.betaTesterCode || request.headers["x-beta-access-code"]),
         betaStatus: String(body.betaStatus || "interested"),
         betaNotes: String(body.betaNotes || ""),
         betaFeedback: String(body.betaFeedback || "")
@@ -3425,6 +3602,7 @@ const server = http.createServer(async (request, response) => {
         valuationStatus: String(body.valuationStatus || finds[index].valuationStatus || ""),
         valuationMethod: String(body.valuationMethod || finds[index].valuationMethod || ""),
         marketEvidence: body.marketEvidence && typeof body.marketEvidence === "object" ? body.marketEvidence : finds[index].marketEvidence || null,
+        betaTesterCode: betaScoutCode(body.betaTesterCode || request.headers["x-beta-access-code"] || finds[index].betaTesterCode),
         updatedAt: new Date().toISOString()
       };
 

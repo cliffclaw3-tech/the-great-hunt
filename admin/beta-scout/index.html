@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Beta Scout | The Great Hunt</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      body { background: var(--paper); color: var(--ink); }
+      .admin-shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 48px; }
+      .admin-top { display: flex; justify-content: space-between; gap: 18px; align-items: end; margin-bottom: 22px; }
+      .admin-top h1 { font-size: clamp(2rem, 5vw, 4rem); }
+      .admin-grid { display: grid; grid-template-columns: 340px 1fr; gap: 18px; align-items: start; }
+      .admin-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px; box-shadow: var(--shadow); }
+      .admin-panel form, .admin-field { display: grid; gap: 10px; }
+      .admin-field input, .admin-field textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 0.8rem; background: #fff; }
+      .score-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+      .score-tile { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+      .score-tile span { display: block; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; font-weight: 900; }
+      .score-tile strong { display: block; margin-top: 4px; font-size: 1.8rem; }
+      .tester-table-wrap { overflow-x: auto; }
+      .tester-table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+      .tester-table th, .tester-table td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      .tester-table th { color: var(--muted); font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0; }
+      .code-pill { display: inline-flex; padding: 0.25rem 0.45rem; border-radius: 999px; background: rgba(37, 118, 83, 0.12); color: var(--green); font-weight: 900; }
+      .score-flags { display: flex; flex-wrap: wrap; gap: 6px; }
+      .score-flags span { padding: 0.22rem 0.45rem; border-radius: 999px; background: #f1eee4; color: var(--muted); font-size: 0.78rem; font-weight: 800; }
+      .score-flags .is-done { background: rgba(37, 118, 83, 0.14); color: var(--green); }
+      #adminMessage { min-height: 1.4em; color: var(--muted); font-weight: 800; }
+      @media (max-width: 860px) {
+        .admin-top, .admin-grid { display: grid; grid-template-columns: 1fr; }
+        .score-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="admin-shell">
+      <section class="admin-top">
+        <div>
+          <p class="eyebrow">The Great Hunt</p>
+          <h1>Beta Scout</h1>
+          <p class="section-help">Add tester invite codes, track signup agreement, and score beta movement.</p>
+        </div>
+        <label class="admin-field">
+          Admin beta code
+          <input id="adminCode" type="password" autocomplete="one-time-code" placeholder="HUNT2026 or an active tester code" />
+        </label>
+      </section>
+
+      <section class="admin-grid">
+        <article class="admin-panel">
+          <h2>Add tester</h2>
+          <form id="testerForm">
+            <label class="admin-field">
+              Name
+              <input name="name" required placeholder="Tester name" />
+            </label>
+            <label class="admin-field">
+              Email
+              <input name="email" type="email" placeholder="tester@example.com" />
+            </label>
+            <label class="admin-field">
+              Invite code
+              <input name="code" required placeholder="MOM-JUNE" />
+            </label>
+            <label class="admin-field">
+              Notes
+              <textarea name="notes" rows="3" placeholder="Region, device, assignment"></textarea>
+            </label>
+            <button class="primary-action" type="submit">Add tester</button>
+            <p id="adminMessage" role="status"></p>
+          </form>
+        </article>
+
+        <section>
+          <div id="scoreRow" class="score-row" aria-live="polite"></div>
+          <div class="tester-table-wrap">
+            <table class="tester-table">
+              <thead>
+                <tr>
+                  <th>Tester</th>
+                  <th>Code</th>
+                  <th>Score</th>
+                  <th>Counts</th>
+                  <th>Last opened</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="testerRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script>
+      const codeInput = document.querySelector("#adminCode");
+      const message = document.querySelector("#adminMessage");
+      const savedAdminCodeKey = "great-hunt-beta-scout-admin-code";
+      codeInput.value = localStorage.getItem(savedAdminCodeKey) || localStorage.getItem("great-hunt-beta-code") || "";
+
+      function headers() {
+        const code = codeInput.value.trim();
+        if (code) localStorage.setItem(savedAdminCodeKey, code);
+        return { "Content-Type": "application/json", "X-Beta-Access-Code": code };
+      }
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
+        if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+        return response.json();
+      }
+
+      function renderScores(totals = {}) {
+        const metrics = [
+          ["Invited", totals.invited || 0],
+          ["Signed up", totals.signedUp || 0],
+          ["Opened", totals.opened || 0],
+          ["Tested", totals.tested || 0],
+          ["Saved", totals.saved || 0],
+          ["Feedback", totals.feedback || 0]
+        ];
+        document.querySelector("#scoreRow").innerHTML = metrics.map(([label, value]) => `
+          <div class="score-tile"><span>${label}</span><strong>${value}</strong></div>
+        `).join("");
+      }
+
+      function flag(label, done) {
+        return `<span class="${done ? "is-done" : ""}">${label}</span>`;
+      }
+
+      function renderRows(testers = []) {
+        document.querySelector("#testerRows").innerHTML = testers.length ? testers.map(tester => `
+          <tr>
+            <td><strong>${tester.name}</strong><br><span>${tester.email || ""}</span></td>
+            <td><span class="code-pill">${tester.code}</span></td>
+            <td>
+              <strong>${tester.score.points}/5</strong>
+              <div class="score-flags">
+                ${flag("signed-up", tester.score.signedUp)}
+                ${flag("opened", tester.score.opened)}
+                ${flag("tested", tester.score.tested)}
+                ${flag("saved", tester.score.saved)}
+                ${flag("feedback", tester.score.feedback)}
+              </div>
+            </td>
+            <td>${tester.score.eventCount} events<br>${tester.score.savedCount} saved<br>${tester.score.feedbackCount} feedback</td>
+            <td>${tester.lastOpenedAt || "Not opened"}</td>
+            <td>${tester.notes || ""}</td>
+          </tr>
+        `).join("") : `<tr><td colspan="6">No testers added yet.</td></tr>`;
+      }
+
+      async function load() {
+        try {
+          const summary = await api("/api/beta-scout");
+          renderScores(summary.totals);
+          renderRows(summary.testers);
+          message.textContent = `Loaded ${summary.totals.invited} tester invite${summary.totals.invited === 1 ? "" : "s"}.`;
+        } catch (error) {
+          renderScores();
+          renderRows();
+          message.textContent = "Enter the beta/admin code to load Beta Scout.";
+        }
+      }
+
+      document.querySelector("#testerForm").addEventListener("submit", async event => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        const payload = Object.fromEntries(form.entries());
+        try {
+          await api("/api/beta-scout/testers", { method: "POST", body: JSON.stringify(payload) });
+          event.currentTarget.reset();
+          message.textContent = "Tester invite saved.";
+          load();
+        } catch {
+          message.textContent = "Tester invite could not be saved. Check the admin beta code.";
+        }
+      });
+
+      codeInput.addEventListener("change", load);
+      load();
+    </script>
+  </body>
+</html>

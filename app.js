@@ -2930,6 +2930,10 @@ function savedBetaCode() {
   return localStorage.getItem(betaAccessKey) || "";
 }
 
+function savedBetaTesterCode() {
+  return savedBetaCode().trim().toUpperCase();
+}
+
 async function apiRequest(path, options = {}) {
   if (location.protocol === "file:") {
     throw new Error("Local API is only available through the live server.");
@@ -2961,6 +2965,7 @@ function logActivityEvent(event) {
     },
     body: JSON.stringify({
       ...event,
+      testerCode: savedBetaTesterCode(),
       clientAt: new Date().toISOString()
     })
   }).catch(() => {});
@@ -2997,11 +3002,17 @@ async function checkBetaAccess() {
 async function submitBetaAccess(event) {
   event.preventDefault();
   const input = document.querySelector("#betaAccessCode");
+  const agreement = document.querySelector("#betaAgreement");
   const message = document.querySelector("#betaGateMessage");
   const code = input.value.trim();
 
   if (!code) {
     message.textContent = "Enter the beta code Wes gave you.";
+    return;
+  }
+
+  if (!agreement.checked) {
+    message.textContent = "Accept the beta agreement before unlocking the app.";
     return;
   }
 
@@ -3011,7 +3022,7 @@ async function submitBetaAccess(event) {
     const response = await fetch("/api/beta/access", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code })
+      body: JSON.stringify({ code, agreementAccepted: agreement.checked })
     });
     const result = await response.json();
 
@@ -3022,6 +3033,7 @@ async function submitBetaAccess(event) {
 
     localStorage.setItem(betaAccessKey, code);
     input.value = "";
+    agreement.checked = false;
     setAppLocked(false);
     initApp();
   } catch {
@@ -5738,6 +5750,7 @@ let appInitialized = false;
 function initApp() {
   if (appInitialized) return;
   appInitialized = true;
+  logActivityEvent({ type: "app-opened", success: true });
   setupVoiceInputs();
   switchView("feed");
   syncThresholdLabels();
