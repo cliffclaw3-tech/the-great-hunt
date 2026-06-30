@@ -3121,13 +3121,27 @@ async function createBetaTester(body, request) {
   };
 }
 
+async function withTimeout(promise, timeoutMs, fallback) {
+  let timeout;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise(resolve => {
+        timeout = setTimeout(() => resolve(fallback), timeoutMs);
+      })
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function healthStatus(request) {
   const values = await readEnvValues();
   const config = configStatus(values);
   const finds = await readFinds();
   const betaScout = await betaScoutSummary();
   const testers = await readBetaTesters();
-  const crawl4AiReady = await hasCrawl4Ai();
+  const crawl4AiReady = await withTimeout(hasCrawl4Ai(), 1000, false);
   const publicUrl = config.publicUrl || "";
   const requestHost = String(request.headers.host || "");
   const runningLocal = /^(127\.0\.0\.1|localhost)(:\d+)?$/.test(requestHost);

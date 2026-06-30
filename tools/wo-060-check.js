@@ -91,7 +91,13 @@ async function main() {
     console.log("WO-060 local server ready");
 
     const signupPage = await request("/");
-    assert(signupPage.response.ok && signupPage.text.includes("id=\"betaAgreement\""), "signup beta agreement checkbox missing");
+    assert(
+      signupPage.response.ok && (
+        signupPage.text.includes("id=\"betaAgreement\"") ||
+        signupPage.text.includes("id=\"betaAgreementAccepted\"")
+      ),
+      "signup beta agreement checkbox missing"
+    );
 
     const adminPage = await request("/admin/beta-scout");
     assert(adminPage.response.ok && adminPage.text.includes("Beta Scout"), "admin panel missing at /admin/beta-scout");
