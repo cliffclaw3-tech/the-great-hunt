@@ -2432,6 +2432,191 @@ async function writePhotoEvent(event) {
   }
 }
 
+const onboardingEmails = {
+  welcome: {
+    subject: "Your Great Hunt beta access (code inside)",
+    preview: "30 seconds to your first comp lookup ->",
+    body: `Hey,
+
+You're in. Here's your beta access code:
+
+**HUNT2026**
+
+Use it at **[thegreathunt.io](https://thegreathunt.io)**
+
+---
+
+**How to run your first lookup:**
+
+1. Go to thegreathunt.io and enter code HUNT2026
+2. Type an item name - start with something specific (brand + model beats "vintage camera")
+3. The Great Hunt pulls eBay sold comps and shows you the buy/sell spread
+4. Verdict: buy, skip, or save for later
+
+That's it. The whole loop takes about 30 seconds once you're set up.
+
+---
+
+**What's in the beta right now:**
+- eBay comp lookup (photo or text)
+- Buy/sell spread calculator
+- Estate sale radar (upcoming sales near you)
+- Hunt protocols for 8 categories (cameras, jewelry, tools, etc.)
+- $1K challenge leaderboard
+- Invite system (share with pickers you trust)
+
+---
+
+**A note on the comp data:**
+The comps come from eBay sold listings - actual completed sales, not asking prices. The spread factors in typical fees. It's a starting point, not an appraisal. Your experience with a category will always beat it for edge cases, but for the 30-second decision in a crowded estate sale? This is what it's built for.
+
+If you run into anything weird, reply to this email. It goes to a real person.
+
+Good hunting,
+Wes
+The Great Hunt`
+  },
+  day3: {
+    subject: "3 things that make estate sale lookups faster",
+    preview: "The item name trick that saves time in the field ->",
+    body: `Hey,
+
+Three days in - wanted to share a few things that make The Great Hunt more useful in the field, specifically at estate sales. These come from actual use, not theory.
+
+---
+
+**1. Specific beats vague on item names**
+
+The difference between a useful comp and useless noise is usually the search term. "Vintage camera" gives you a mess. "Canon AE-1 35mm" gives you 90 days of actual eBay sold data for that specific model.
+
+If you can read a brand name, model number, or maker's mark - type that. The more specific, the better the comp.
+
+For jewelry and ceramics with signatures: type the signature exactly as it appears. A lot of signed pieces have enough sold history on eBay that you'll get comps even for makers you've never heard of.
+
+---
+
+**2. The spread is what matters, not the comp price**
+
+If a comp shows $100 average sale price but the spread (after eBay fees, shipping estimate, and your cost of goods) is $12 - that's a pass. The comp number is the headline. The spread is the actual answer.
+
+Get in the habit of looking at the spread first.
+
+---
+
+**3. Use the estate sale radar the night before**
+
+If you've got multiple sales on a Saturday, pull up the radar on Friday night and rank them. The radar shows you what's listed in the preview - furniture-heavy sales read differently than tool/collectible sales. Going to the right sale first matters when the best stuff goes in the first 20 minutes.
+
+You won't always be able to tell from the preview. But when you can, it saves a wasted drive.
+
+---
+
+**4. Save items you're unsure about**
+
+The "save for later" verdict isn't just a maybe pile - it's a learning tool. After a few weeks, look back at what you saved and didn't buy. Did any of them show up later at higher prices? Did some tank? The save history is how you get calibrated on categories you're still learning.
+
+---
+
+That's it. No pitch, just four things that'll make the next estate sale more useful.
+
+If you've gone on a hunt with the app and want to share how it went - reply here. Good finds, bad misses, features that confused you - all of it is useful.
+
+Good hunting,
+Wes
+The Great Hunt`
+  }
+};
+
+function onboardingFromEmail() {
+  return {
+    email: String(process.env.ONBOARDING_FROM_EMAIL || "support@thegreathunt.io").trim(),
+    name: String(process.env.ONBOARDING_FROM_NAME || "Wes").trim() || "Wes"
+  };
+}
+
+function onboardingReplyTo() {
+  const email = String(process.env.REPLY_TO_EMAIL || process.env.ONBOARDING_REPLY_TO_EMAIL || process.env.ONBOARDING_FROM_EMAIL || "support@thegreathunt.io").trim();
+  const name = String(process.env.REPLY_TO_NAME || process.env.ONBOARDING_REPLY_TO_NAME || "Wes").trim() || "Wes";
+  return { email, name };
+}
+
+function markdownEmailToHtml(text, preview) {
+  const body = String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+    .replace(/\n/g, "<br>");
+  const hiddenPreview = preview
+    ? `<span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden">${preview}</span>`
+    : "";
+  return `${hiddenPreview}<div style="font-family:Arial,sans-serif;font-size:16px;line-height:1.55;color:#1c2520">${body}</div>`;
+}
+
+async function sendOnboardingEmail({ to, email, sendAt }) {
+  const dryRun = process.env.ONBOARDING_EMAIL_DRY_RUN === "true";
+  const apiKey = String(process.env.SENDGRID_API_KEY || "").trim();
+  const scheduledAt = sendAt ? new Date(sendAt * 1000).toISOString() : "";
+
+  if (dryRun) {
+    return {
+      ok: true,
+      provider: "sendgrid",
+      dryRun: true,
+      messageId: `dry-run-${email.subject.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`,
+      scheduledAt
+    };
+  }
+
+  if (!apiKey) {
+    return {
+      ok: false,
+      provider: "sendgrid",
+      error: "SENDGRID_API_KEY is not configured",
+      scheduledAt
+    };
+  }
+
+  const payload = {
+    personalizations: [{
+      to: [{ email: to }],
+      ...(sendAt ? { send_at: sendAt } : {})
+    }],
+    from: onboardingFromEmail(),
+    reply_to: onboardingReplyTo(),
+    subject: email.subject,
+    content: [
+      { type: "text/plain", value: email.body },
+      { type: "text/html", value: markdownEmailToHtml(email.body, email.preview) }
+    ],
+    tracking_settings: {
+      click_tracking: { enable: false, enable_text: false }
+    }
+  };
+
+  const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+  const responseText = await response.text();
+  return {
+    ok: response.status === 202,
+    provider: "sendgrid",
+    dryRun: false,
+    status: response.status,
+    subject: email.subject,
+    messageId: response.headers.get("x-message-id") || "",
+    sentAt: sendAt ? "" : new Date().toISOString(),
+    scheduledAt,
+    error: response.status === 202 ? "" : responseText.slice(0, 500)
+  };
+}
+
 function shortText(value, max = 240) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
 }
@@ -3071,8 +3256,46 @@ async function createBetaTester(body, request) {
     return { status: 400, payload: { accepted: false, error: "Beta agreement must be accepted." } };
   }
 
+  const nowDate = new Date();
+  const day3SendAt = Math.floor((nowDate.getTime() + 72 * 60 * 60 * 1000) / 1000);
+  const [welcomeSend, day3Send] = await Promise.all([
+    sendOnboardingEmail({ to: email, email: onboardingEmails.welcome }),
+    sendOnboardingEmail({ to: email, email: onboardingEmails.day3, sendAt: day3SendAt })
+  ]);
+  const onboarding = {
+    welcome: {
+      ok: Boolean(welcomeSend.ok),
+      provider: welcomeSend.provider,
+      status: welcomeSend.status || null,
+      messageId: welcomeSend.messageId || "",
+      dryRun: Boolean(welcomeSend.dryRun),
+      subject: onboardingEmails.welcome.subject,
+      sentAt: welcomeSend.sentAt || new Date().toISOString()
+    },
+    day3: {
+      ok: Boolean(day3Send.ok),
+      provider: day3Send.provider,
+      status: day3Send.status || null,
+      messageId: day3Send.messageId || "",
+      dryRun: Boolean(day3Send.dryRun),
+      subject: onboardingEmails.day3.subject,
+      scheduledAt: day3Send.scheduledAt,
+      delayHours: 72
+    }
+  };
+  if (!welcomeSend.ok || !day3Send.ok) {
+    return {
+      status: 502,
+      payload: {
+        accepted: false,
+        error: "Email onboarding did not start.",
+        onboarding
+      }
+    };
+  }
+
   const testers = await readBetaTesters();
-  const now = new Date().toISOString();
+  const now = nowDate.toISOString();
   const existingIndex = testers.findIndex(tester => String(tester.email || "").toLowerCase() === email);
   const base = existingIndex >= 0 ? testers[existingIndex] : {};
   const tester = {
@@ -3087,7 +3310,8 @@ async function createBetaTester(body, request) {
     joinedAt: base.joinedAt || now,
     lastSeenAt: now,
     source: shortText(body.source, 80) || "beta gate",
-    userAgent: shortText(request.headers["user-agent"], 240)
+    userAgent: shortText(request.headers["user-agent"], 240),
+    onboarding
   };
 
   if (existingIndex >= 0) testers[existingIndex] = tester;
@@ -3108,6 +3332,7 @@ async function createBetaTester(body, request) {
     message: `${name} joined the private beta`,
     testerCode: invite ? submittedCode : "",
     status: tester.status,
+    payload: { onboarding },
     success: true
   });
 
@@ -3116,7 +3341,8 @@ async function createBetaTester(body, request) {
     payload: {
       accepted: true,
       enabled: Boolean(betaAccessCode()),
-      tester: publicTesterRecord(tester)
+      tester: publicTesterRecord(tester),
+      onboarding
     }
   };
 }
