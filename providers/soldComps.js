@@ -3,6 +3,9 @@ const path = require("node:path");
 
 const SOLD_COMPS_API_BASE = process.env.SOLD_COMPS_API_BASE || "https://api.sold-comps.com";
 const cachePath = path.join(__dirname, "..", "data", "soldcomps-cache.json");
+const usagePath = path.join(__dirname, "..", "data", "soldcomps-usage.json");
+const DEFAULT_CACHE_TTL_HOURS = 24 * 14;
+const DEFAULT_MONTHLY_LIMIT = 80;
 
 function hasCredentials() {
   return Boolean(process.env.SOLD_COMPS_API_KEY && !String(process.env.SOLD_COMPS_API_KEY).includes("your-"));
@@ -33,9 +36,65 @@ async function writeCache(cache) {
   }
 }
 
+function monthKey(date = new Date()) {
+  return date.toISOString().slice(0, 7);
+}
+
+function cacheTtlMs() {
+  const hours = Number(process.env.SOLD_COMPS_CACHE_TTL_HOURS || DEFAULT_CACHE_TTL_HOURS);
+  return Math.max(1, hours) * 60 * 60 * 1000;
+}
+
+function monthlyLimit() {
+  const value = Number(process.env.SOLD_COMPS_MONTHLY_LIMIT || DEFAULT_MONTHLY_LIMIT);
+  return Number.isFinite(value) ? Math.max(0, value) : DEFAULT_MONTHLY_LIMIT;
+}
+
+async function readUsage() {
+  try {
+    return JSON.parse(await fs.readFile(usagePath, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+async function writeUsage(usage) {
+  try {
+    await fs.mkdir(path.dirname(usagePath), { recursive: true });
+    await fs.writeFile(usagePath, `${JSON.stringify(usage, null, 2)}\n`);
+  } catch {
+    // Usage writes should never break valuation; the provider still has quota guards from the API.
+  }
+}
+
+async function currentUsage() {
+  const usage = await readUsage();
+  const key = monthKey();
+  return {
+    usage,
+    key,
+    count: Number(usage[key]?.requests || 0)
+  };
+}
+
+async function incrementUsage() {
+  const { usage, key, count } = await currentUsage();
+  usage[key] = {
+    requests: count + 1,
+    updatedAt: new Date().toISOString()
+  };
+  await writeUsage(usage);
+  return usage[key].requests;
+}
+
 async function cachedResult(key) {
   const cache = await readCache();
-  return cache[key]?.result || null;
+  const entry = cache[key];
+  if (!entry?.result) return null;
+  return {
+    ...entry.result,
+    cachedAt: entry.cachedAt
+  };
 }
 
 async function saveCachedResult(key, result) {
@@ -164,6 +223,47 @@ async function searchSoldComps({ item, category, limit = 24 }) {
 
   const query = buildSearchQuery({ item, category });
   const key = cacheKey({ query, category, limit });
+  const cached = await cachedResult(key);
+  const cachedAt = cached?.cachedAt ? Date.parse(cached.cachedAt) : 0;
+  const cacheFresh = cached && cachedAt && Date.now() - cachedAt <= cacheTtlMs();
+  const forceRefresh = process.env.SOLD_COMPS_FORCE_REFRESH === "true";
+  const cacheOnly = process.env.SOLD_COMPS_CACHE_ONLY === "true";
+
+  if (cacheFresh && !forceRefresh) {
+    return {
+      ...cached,
+      source: "SoldComps sold API cache",
+      cached: true
+    };
+  }
+
+  if (cacheOnly) {
+    if (cached) {
+      return {
+        ...cached,
+        source: "SoldComps sold API cache",
+        cached: true,
+        stale: !cacheFresh
+      };
+    }
+    throw new Error("SoldComps cache-only mode: no cached result");
+  }
+
+  const { count } = await currentUsage();
+  const limitForMonth = monthlyLimit();
+  if (limitForMonth > 0 && count >= limitForMonth) {
+    if (cached) {
+      return {
+        ...cached,
+        source: "SoldComps sold API cache",
+        cached: true,
+        quotaWarning: `Local SoldComps monthly limit reached (${count}/${limitForMonth})`
+      };
+    }
+    throw new Error(`SoldComps monthly limit reached (${count}/${limitForMonth})`);
+  }
+
+  await incrementUsage();
   const params = new URLSearchParams({
     keyword: query,
     count: String(Math.max(1, Math.min(240, limit))),
@@ -185,7 +285,6 @@ async function searchSoldComps({ item, category, limit = 24 }) {
   if (!response.ok) {
     const errorText = await response.text();
     if (response.status === 429) {
-      const cached = await cachedResult(key);
       if (cached) {
         return {
           ...cached,

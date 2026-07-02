@@ -1,6 +1,10 @@
 const { buildLookupDeal } = require("../server");
 const { writeReliabilitySuite } = require("./reliability-report");
 
+if (process.env.LIVE_VALUATION_AUDIT !== "true") {
+  process.env.SOLD_COMPS_CACHE_ONLY = process.env.SOLD_COMPS_CACHE_ONLY || "true";
+}
+
 const cases = [
   { persona: "garage-sale", item: "Le Creuset skillet", category: "Retail arbitrage" },
   { persona: "garage-sale", item: "Nikon film camera lens", category: "Cameras" },

@@ -3,6 +3,7 @@
     "start": "node server.js",
     "start:production": "NODE_ENV=production node server.js",
     "audit:valuation": "node tools/valuation-audit.js",
+    "audit:valuation:live": "LIVE_VALUATION_AUDIT=true node tools/valuation-audit.js",
     "audit:categories": "node tools/category-sweep.js",
     "audit:classifieds": "node tools/classifieds-firehose.js",
     "audit:redteam": "node tools/red-team-audit.js",

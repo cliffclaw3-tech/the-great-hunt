@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-02T19:31:38.550Z",
+  "updatedAt": "2026-07-02T19:44:45.820Z",
   "suites": {
     "redTeam": {
       "label": "Red-team sweep",
@@ -139,7 +139,7 @@
           "cleanCoverage": 100
         }
       ],
-      "updatedAt": "2026-07-02T19:31:38.552Z"
+      "updatedAt": "2026-07-02T19:44:45.821Z"
     },
     "categories": {
       "label": "Category sweep",
