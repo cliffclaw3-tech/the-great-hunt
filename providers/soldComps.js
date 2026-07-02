@@ -60,7 +60,8 @@ function categoryIdFor(category) {
     "Vintage audio": "293",
     Instruments: "619",
     "Retail arbitrage": "0",
-    Tools: "11700"
+    Tools: "11700",
+    "Video games": "139973"
   };
 
   return map[category] || "0";
@@ -72,6 +73,16 @@ function tokenize(value) {
     .replace(/[^a-z0-9]+/g, " ")
     .split(" ")
     .filter(Boolean);
+}
+
+function hasTokenBoundary(text, token) {
+  const normalizedToken = String(token || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (!normalizedToken) return false;
+  const pattern = normalizedToken
+    .split(/\s+/)
+    .map(part => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("[^a-z0-9]+");
+  return new RegExp(`(?:^|[^a-z0-9])${pattern}(?=$|[^a-z0-9])`, "i").test(String(text || ""));
 }
 
 function filterReason(title, queryTokens) {
@@ -93,7 +104,7 @@ function filterReason(title, queryTokens) {
     return matchedPattern[1];
   }
 
-  const tokenHits = queryTokens.filter(token => lower.includes(token));
+  const tokenHits = queryTokens.filter(token => hasTokenBoundary(lower, token));
   return queryTokens.length > 0 && tokenHits.length === 0 ? "Missing item keywords" : "";
 }
 
@@ -103,11 +114,11 @@ function confidenceScore({ query, item }) {
   const exactPhrase = String(query || "").trim().toLowerCase();
   let score = 50;
 
-  if (exactPhrase && title.includes(exactPhrase)) score += 25;
-  score += Math.min(24, queryTokens.filter(token => title.includes(token)).length * 5);
+  if (exactPhrase && hasTokenBoundary(title, exactPhrase)) score += 25;
+  score += Math.min(24, queryTokens.filter(token => hasTokenBoundary(title, token)).length * 5);
 
   const refLikeTokens = queryTokens.filter(token => /\d/.test(token) || /[a-z]+\d|\d+[a-z]+/i.test(token));
-  score += Math.min(18, refLikeTokens.filter(token => title.includes(token)).length * 9);
+  score += Math.min(18, refLikeTokens.filter(token => hasTokenBoundary(title, token)).length * 9);
 
   if (item.epid) score += 5;
   if (item.sellerFeedbackScore && Number(item.sellerFeedbackScore) > 100) score += 2;
@@ -124,6 +135,7 @@ function normalizeSoldItem(item, query) {
   const price = parsePrice(item.soldPrice);
   const shipping = parsePrice(item.shippingPrice) || 0;
   const total = parsePrice(item.totalPrice);
+  const currency = item.currency || item.priceCurrency || item.soldPriceCurrency || "USD";
 
   return {
     title: item.title || "Untitled sold comp",
@@ -136,6 +148,8 @@ function normalizeSoldItem(item, query) {
     image: item.imageUrl || item.image || null,
     soldDate: item.endedAt || null,
     confidence: confidenceScore({ query, item }),
+    currency,
+    shippingCurrency: currency,
     buyingOptions: ["SOLD"],
     epid: item.epid || null,
     sellerFeedbackScore: item.sellerFeedbackScore || null,
@@ -193,8 +207,9 @@ async function searchSoldComps({ item, category, limit = 24 }) {
     .map(listing => normalizeSoldItem(listing, query))
     .filter(listing => {
       const reason = filterReason(listing.title, queryTokens);
-      if (reason || listing.price === null || !listing.url) {
-        rejected.push({ ...listing, reason: reason || "Missing sale price or URL" });
+      const currencyMismatch = listing.currency !== "USD" || listing.shippingCurrency !== "USD";
+      if (reason || listing.price === null || !listing.url || currencyMismatch) {
+        rejected.push({ ...listing, reason: reason || (currencyMismatch ? "Non-USD sold comp" : "Missing sale price or URL") });
         return false;
       }
       return true;

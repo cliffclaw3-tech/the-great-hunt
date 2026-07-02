@@ -74,7 +74,8 @@ function categoryHints(category) {
     "Sports cards": ["card", "rookie", "psa", "sgc", "bgs", "topps", "panini", "bowman", "prizm"],
     Lighting: ["lamp", "lighting", "shade", "sconce", "chandelier", "table lamp", "floor lamp"],
     Furniture: ["table", "chair", "dresser", "desk", "cabinet", "teak", "walnut", "mid century"],
-    Toys: ["toy", "lego", "set", "doll", "figure", "hot wheels", "funko", "complete"]
+    Toys: ["toy", "lego", "set", "doll", "figure", "hot wheels", "funko", "complete"],
+    "Video games": ["nintendo", "game", "cartridge", "disc", "cib", "complete", "console"]
   };
 
   return map[category] || [];
@@ -90,6 +91,16 @@ function tokenize(value) {
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function hasTokenBoundary(text, token) {
+  const normalizedToken = String(token || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (!normalizedToken) return false;
+  const pattern = normalizedToken
+    .split(/\s+/)
+    .map(escapeRegExp)
+    .join("[^a-z0-9]+");
+  return new RegExp(`(?:^|[^a-z0-9])${pattern}(?=$|[^a-z0-9])`, "i").test(String(text || ""));
 }
 
 function filterReason(title, queryTokens) {
@@ -111,7 +122,7 @@ function filterReason(title, queryTokens) {
     return matchedPattern[1];
   }
 
-  const tokenHits = queryTokens.filter(token => lower.includes(token));
+  const tokenHits = queryTokens.filter(token => hasTokenBoundary(lower, token));
   return queryTokens.length > 0 && tokenHits.length === 0 ? "Missing item keywords" : "";
 }
 
@@ -122,12 +133,12 @@ function confidenceScore({ query, category, item }) {
   const hints = categoryHints(category);
   let score = 45;
 
-  if (exactPhrase && title.includes(exactPhrase)) score += 25;
+  if (exactPhrase && hasTokenBoundary(title, exactPhrase)) score += 25;
 
-  const tokenMatches = queryTokens.filter(token => title.includes(token)).length;
+  const tokenMatches = queryTokens.filter(token => hasTokenBoundary(title, token)).length;
   score += Math.min(20, tokenMatches * 4);
 
-  const hintMatches = hints.filter(token => title.includes(token)).length;
+  const hintMatches = hints.filter(token => hasTokenBoundary(title, token)).length;
   score += Math.min(8, hintMatches * 2);
 
   if (item.condition) {
@@ -138,7 +149,7 @@ function confidenceScore({ query, category, item }) {
 
   const refLikeTokens = queryTokens.filter(token => /\d/.test(token) || /[a-z]+\d|\d+[a-z]+/i.test(token));
   if (refLikeTokens.length) {
-    const matchedRefs = refLikeTokens.filter(token => title.includes(token)).length;
+    const matchedRefs = refLikeTokens.filter(token => hasTokenBoundary(title, token)).length;
     score += Math.min(18, matchedRefs * 9);
   }
 
@@ -151,6 +162,8 @@ function parsePrice(value) {
 }
 
 function normalizeItem(item, query, category) {
+  const priceCurrency = item.price?.currency || item.price?.currencyCode || "USD";
+  const shippingCurrency = item.shippingOptions?.[0]?.shippingCost?.currency || item.shippingOptions?.[0]?.shippingCost?.currencyCode || priceCurrency;
   const price = parsePrice(item.price?.value);
   const shipping = parsePrice(item.shippingOptions?.[0]?.shippingCost?.value) || 0;
   const confidence = confidenceScore({ query, category, item });
@@ -165,6 +178,8 @@ function normalizeItem(item, query, category) {
     image: item.image?.imageUrl || item.thumbnailImages?.[0]?.imageUrl || null,
     soldDate: item.itemEndDate || null,
     confidence,
+    currency: priceCurrency,
+    shippingCurrency,
     buyingOptions: item.buyingOptions || []
   };
 }
@@ -172,6 +187,8 @@ function normalizeItem(item, query, category) {
 function normalizeSoldItem(item, query, category) {
   const salePrice = item.lastSoldPrice || item.price || item.sellingPrice || item.currentBidPrice;
   const shippingCost = item.shippingOptions?.[0]?.shippingCost || item.shippingCost;
+  const priceCurrency = salePrice?.currency || salePrice?.currencyCode || "USD";
+  const shippingCurrency = shippingCost?.currency || shippingCost?.currencyCode || priceCurrency;
   const price = parsePrice(salePrice?.value || salePrice);
   const shipping = parsePrice(shippingCost?.value || shippingCost) || 0;
   const title = item.title || item.itemGroupTitle || "Untitled eBay sold comp";
@@ -187,6 +204,8 @@ function normalizeSoldItem(item, query, category) {
     image: item.image?.imageUrl || item.thumbnailImages?.[0]?.imageUrl || null,
     soldDate: item.lastSoldDate || item.itemEndDate || null,
     confidence,
+    currency: priceCurrency,
+    shippingCurrency,
     buyingOptions: ["SOLD"]
   };
 }
@@ -223,8 +242,9 @@ async function searchEbay({ item, category, limit = 20 }) {
     .map(listing => normalizeItem(listing, query, category))
     .filter(listing => {
       const reason = filterReason(listing.title, queryTokens);
-      if (reason || listing.price === null) {
-        rejected.push({ ...listing, reason: reason || "Missing price" });
+      const currencyMismatch = listing.currency !== "USD" || listing.shippingCurrency !== "USD";
+      if (reason || listing.price === null || currencyMismatch) {
+        rejected.push({ ...listing, reason: reason || (currencyMismatch ? "Non-USD listing" : "Missing price") });
         return false;
       }
       return true;
@@ -271,8 +291,9 @@ async function searchEbaySold({ item, category, limit = 20 }) {
     .map(listing => normalizeSoldItem(listing, query, category))
     .filter(listing => {
       const reason = filterReason(listing.title, queryTokens);
-      if (reason || listing.price === null) {
-        rejected.push({ ...listing, reason: reason || "Missing sale price" });
+      const currencyMismatch = listing.currency !== "USD" || listing.shippingCurrency !== "USD";
+      if (reason || listing.price === null || currencyMismatch) {
+        rejected.push({ ...listing, reason: reason || (currencyMismatch ? "Non-USD sold comp" : "Missing sale price") });
         return false;
       }
       return true;

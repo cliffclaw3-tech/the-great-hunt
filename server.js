@@ -67,6 +67,7 @@ function categoryFallbackValue(category, item = "") {
     Tools: 35,
     Cameras: 75,
     "Retail arbitrage": 28,
+    "Video games": 35,
     "Comic books": 35,
     "Sports cards": 25,
     "Sports memorabilia": 50,
@@ -169,6 +170,19 @@ function conditionDetails(condition) {
   };
 
   return map[condition] || map.clean;
+}
+
+function conditionBucketForText(value) {
+  const text = String(value || "").toLowerCase();
+  if (/\b(psa|sgc|bgs|beckett|cgc|graded|slab|vga|wata|grade\s*\d|9\.8|10)\b/.test(text)) return "graded";
+  if (/\b(sealed|new sealed|factory sealed|unopened|new in box|nib)\b/.test(text)) return "sealed";
+  if (/\b(cib|complete in box|complete\s+w\/?\s*box|box(?:ed)?\s+complete|with box|w\/box|manual|case and manual|box and manual)\b/.test(text)) return "cib";
+  if (/\b(loose|cartridge only|cart only|disc only|game only|no box|without box|case only|box only|manual only)\b/.test(text)) return "loose";
+  return "";
+}
+
+function conditionBucketForQuery(condition, item) {
+  return conditionBucketForText(`${condition || ""} ${item || ""}`);
 }
 
 function conditionHints(category) {
@@ -328,23 +342,18 @@ function insufficientIdentifierReason(item, category = "") {
 function applyConditionToDeal(deal, condition) {
   const details = conditionDetails(condition);
   const baseFastSale = Number(deal.fastSale || 0);
-  const ask = Number(deal.ask || 0);
-  const conditionAdjustedFastSale = Math.round(baseFastSale * details.multiplier);
-  const adjustedFastSale = deal.allowBelowAsk ? conditionAdjustedFastSale : Math.max(ask + 10, conditionAdjustedFastSale);
-  const adjustedCompRange = deal.priceLow && deal.priceHigh
-    ? `${money(deal.priceLow * details.multiplier)}-${money(deal.priceHigh * details.multiplier)}`
-    : deal.compRange;
+  const multiplier = deal.conditionPriced ? 1 : details.multiplier;
+  const conditionAdjustedFastSale = Math.round(baseFastSale * multiplier);
 
   return {
     ...deal,
     condition: details.label,
     conditionKey: condition || "clean",
-    conditionMultiplier: details.multiplier,
+    conditionMultiplier: multiplier,
     conditionNote: details.note,
     conditionHints: conditionHints(deal.category),
     unadjustedFastSale: Math.round(baseFastSale),
-    fastSale: adjustedFastSale,
-    compRange: adjustedCompRange,
+    fastSale: conditionAdjustedFastSale,
     explanation: `${deal.explanation || ""} Condition selected: ${details.label}. ${details.note}`.trim()
   };
 }
@@ -635,7 +644,6 @@ function buildFallbackDeal(input, reason = "Using local estimate fallback.") {
   const multiplier = categoryMultiplier(category);
   const missingAsk = ask <= 0;
   const fallbackValue = categoryFallbackValue(category, item);
-  const highRange = ask * (multiplier + 0.55);
   const collectibleLinks = collectibleReferenceLinks(item, category);
   const collectibleNote = isCollectibleCategory(category)
     ? " Expert-check mode: exact identifiers, marks, maker, artist, grade, appraisal, provenance, and authentication can change value dramatically."
@@ -658,13 +666,13 @@ function buildFallbackDeal(input, reason = "Using local estimate fallback.") {
     checkedSources,
     valuationProof: valuationProofFor(category, item),
     ask,
-    fastSale: missingAsk ? fallbackValue : Math.max(ask + 20, ask * multiplier),
+    fastSale: fallbackValue,
     allowBelowAsk: missingAsk,
-    comps: missingAsk || isCollectibleCategory(category) ? 0 : category === "Vintage audio" ? 4 : 6,
-    compRange: missingAsk ? `${money(fallbackValue * 0.65)}-${money(fallbackValue * 1.35)}` : `${money(ask * 1.45)}-${money(highRange)}`,
+    comps: 0,
+    compRange: "",
     absorption: multiplier > 2 ? "hot" : "steady",
     distance,
-    confidence: missingAsk ? 38 : isCollectibleCategory(category) ? 48 : category === "Vintage audio" ? 69 : 74,
+    confidence: 38,
     photo: fallbackPhoto(category, item),
     compLinks: [
       ...collectibleLinks,
@@ -688,8 +696,13 @@ function buildFallbackDeal(input, reason = "Using local estimate fallback.") {
 
 function percentile(sortedValues, p) {
   if (!sortedValues.length) return 0;
-  const index = Math.min(sortedValues.length - 1, Math.max(0, Math.floor((sortedValues.length - 1) * p)));
-  return sortedValues[index];
+  const sorted = [...sortedValues].sort((a, b) => a - b);
+  if (sorted.length === 1) return sorted[0];
+  const position = (sorted.length - 1) * p;
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  const weight = position - lower;
+  return sorted[lower] + ((sorted[upper] - sorted[lower]) * weight);
 }
 
 function median(values) {
@@ -706,13 +719,14 @@ function absorptionFor(count) {
 function minimumAcceptedCompsFor(category) {
   const minimums = {
     "Sports cards": 3,
-    "Comic books": 2,
+    "Comic books": 3,
     Watches: 3,
     Coins: 3,
     "Vintage audio": 3,
-    Instruments: 3
+    Instruments: 3,
+    "Video games": 3
   };
-  return minimums[category] || 2;
+  return minimums[category] || 3;
 }
 
 function average(values) {
@@ -876,9 +890,69 @@ function normalizeWhitespace(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
+const PLATFORM_ALIASES = [
+  { id: "n64", terms: ["nintendo 64", "n64"] },
+  { id: "snes", terms: ["super nintendo", "snes", "super nes"] },
+  { id: "nes", terms: ["nintendo entertainment system", "nes"] },
+  { id: "gamecube", terms: ["gamecube", "game cube", "gcn"] },
+  { id: "gameboy-advance", terms: ["game boy advance", "gameboy advance", "gba"] },
+  { id: "gameboy-color", terms: ["game boy color", "gameboy color", "gbc"] },
+  { id: "gameboy", terms: ["game boy", "gameboy", "gb"] },
+  { id: "3ds", terms: ["nintendo 3ds", "3ds"] },
+  { id: "ds", terms: ["nintendo ds", "nds", "ds"] },
+  { id: "switch", terms: ["nintendo switch", "switch"] },
+  { id: "ps5", terms: ["playstation 5", "ps5"] },
+  { id: "ps4", terms: ["playstation 4", "ps4"] },
+  { id: "ps3", terms: ["playstation 3", "ps3"] },
+  { id: "ps2", terms: ["playstation 2", "ps2"] },
+  { id: "ps1", terms: ["playstation 1", "ps1", "psx"] },
+  { id: "xbox-series", terms: ["xbox series x", "xbox series s", "xbox series"] },
+  { id: "xbox-one", terms: ["xbox one", "xbone"] },
+  { id: "xbox-360", terms: ["xbox 360", "x360", "360"] },
+  { id: "xbox", terms: ["original xbox", "xbox"] },
+  { id: "genesis", terms: ["sega genesis", "genesis", "mega drive"] },
+  { id: "dreamcast", terms: ["dreamcast"] },
+  { id: "saturn", terms: ["sega saturn", "saturn"] }
+];
+
+function hasTokenBoundary(text, term) {
+  const normalizedText = String(text || "").toLowerCase();
+  const normalizedTerm = String(term || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (!normalizedTerm) return false;
+  const pattern = normalizedTerm
+    .split(/\s+/)
+    .map(part => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("[^a-z0-9]+");
+  return new RegExp(`(?:^|[^a-z0-9])${pattern}(?=$|[^a-z0-9])`, "i").test(normalizedText);
+}
+
+function extractPlatforms(value) {
+  const text = String(value || "").toLowerCase();
+  return PLATFORM_ALIASES
+    .filter(platform => platform.terms.some(term => hasTokenBoundary(text, term)))
+    .map(platform => platform.id)
+    .filter((id, index, array) => array.indexOf(id) === index);
+}
+
+function discriminatingTokens(tokens) {
+  const generic = new Set(["the", "and", "with", "for", "game", "games", "video", "nintendo", "sony", "microsoft", "sega", "complete", "box", "manual", "cib", "edition"]);
+  return tokens
+    .filter(token => !generic.has(token))
+    .filter(token => token.length > 1 || /\d/.test(token))
+    .filter((token, index, array) => array.indexOf(token) === index);
+}
+
+function platformAliasTokens(platformIds) {
+  const ids = new Set(platformIds);
+  return new Set(PLATFORM_ALIASES
+    .filter(platform => ids.has(platform.id))
+    .flatMap(platform => platform.terms.flatMap(term => tokenizeText(term))));
+}
+
 function inferCategoryFromItem(item) {
   const text = String(item || "").toLowerCase();
   const rules = [
+    [/nintendo|super mario|zelda|pokemon|pokémon|\bn64\b|gamecube|game cube|game boy|gameboy|\bgba\b|\bgbc\b|\bnes\b|\bsnes\b|nintendo ds|\b3ds\b|switch|playstation|\bps[1-5]\b|xbox|sega|genesis|dreamcast|saturn|video game|game cartridge|cartridge only|disc only|complete in box|\bcib\b/, "Video games"],
     [/shoe|shoes|sneaker|sneakers|tennis shoe|running shoe|trainer|cleat|boot|boots|sandal|sandals|nike|adidas|new balance|asics|brooks|hoka|skechers|puma|reebok|converse|vans/, "Retail arbitrage"],
     [/apparel|clothing|shirt|pants|jacket|coat|dress|jeans|hoodie|sweater|sweatshirt|shorts|socks|hat|cap|\bsize\s*(?:xs|s|m|l|xl|xxl|\d{1,2}(?:\.\d)?(?:\s|$))|mens|women'?s|kids/, "Retail arbitrage"],
     [/painting|fine art|\bart\b|artist|canvas|oil painting|watercolor|lithograph|serigraph|signed print|framed art|sculpture|gallery label|provenance/, "Art and paintings"],
@@ -1195,16 +1269,36 @@ function compQualityReason({ result, item, category, ask }) {
   const titleTokens = tokenizeText(title);
   const normalizedTitle = titleTokens.join(" ");
   const titleCompact = normalizedTitle.replace(/\s+/g, "");
-  const queryCompact = queryTokens.join("");
   const stopWords = new Set(["the", "and", "with", "for", "vintage", "original", "rare", "old", "used"]);
   let strongCategoryMatch = false;
   const importantTokens = queryTokens
-    .filter(token => token.length > 2 && !stopWords.has(token))
+    .filter(token => !stopWords.has(token))
     .filter((token, index, array) => array.indexOf(token) === index);
-  const matchedImportant = importantTokens.filter(token => titleTokens.includes(token) || titleCompact.includes(token));
+  const matchedImportant = importantTokens.filter(token => titleTokens.includes(token) || hasTokenBoundary(title, token));
+  const queryPlatforms = category === "Video games" ? extractPlatforms(item) : [];
+  const titlePlatforms = category === "Video games" ? extractPlatforms(`${result.title || ""} ${result.condition || ""}`) : [];
+  const sameVideoGamePlatform = queryPlatforms.length && titlePlatforms.length && queryPlatforms.some(platform => titlePlatforms.includes(platform));
+  const queryPlatformTokens = platformAliasTokens(queryPlatforms);
+  const titlePlatformTokens = platformAliasTokens(titlePlatforms);
+  const queryDiscriminators = discriminatingTokens(queryTokens);
+  const titleDiscriminators = discriminatingTokens(titleTokens);
+  const missingImportantDiscriminator = queryDiscriminators
+    .filter(token => !sameVideoGamePlatform || !queryPlatformTokens.has(token))
+    .find(token => /\d/.test(token) && !hasTokenBoundary(title, token));
+  if (missingImportantDiscriminator) return `Missing query discriminator: ${missingImportantDiscriminator}`;
+  const extraPlatformDiscriminator = titleDiscriminators
+    .filter(token => !sameVideoGamePlatform || !titlePlatformTokens.has(token))
+    .find(token => ["64", "ds", "3ds", "gba", "gbc", "nes", "snes", "gamecube", "switch", "ps1", "ps2", "ps3", "ps4", "ps5", "xbox", "360"].includes(token) && !queryTokens.includes(token));
+  if (extraPlatformDiscriminator) return `Comp has extra platform discriminator not in query: ${extraPlatformDiscriminator}`;
+
+  if (category === "Video games") {
+    if (!queryPlatforms.length) return "Video-game platform is ambiguous; needs console/platform before pricing";
+    if (!titlePlatforms.length) return "Comp missing console/platform proof";
+    if (!sameVideoGamePlatform) return `Different video-game platform: query ${queryPlatforms.join("/")} vs comp ${titlePlatforms.join("/")}`;
+  }
   const partPatterns = {
     Instruments: /strings?|\bnut\b|saddles?|bridge pins?|guitar picks?|\bpicks?\b|truss rod tool|fingerboard|guitar case|hardshell case|wood case|strap button|guitar strap|strap lock|tuners?|tuning pegs?|control plate|pickguard|pickup|neck plate|\bneck\b|\bbody\b|bridge cover|knobs?|potentiometer|wiring harness|loaded guard|decals?/,
-    Watches: /^for .*?(strap|bracelet|clasp|band)|strap only|watch strap|mesh strap|rubber\s+(?:band|strap)|watch\s+(?:band|strap)|watch bracelet|\b\d{1,2}mm\s+bracelet\b|bracelet link|watch clasp|\bclasp\b|pusher springs?|bezel insert|dial only|\bdial\s*(?:for|part|replacement)\b|hands only|hands set|\bwatch hands\b|movement only|\bwatch movement\b|\bnh3[5-6]a?\s+watch movement\b|case\s*&\s*movement|case and movement|watch case|case part|case only|case\s*back|caseback|warranty only|crystal|watch crown|crown only|crown stem|servicing|pressure test/,
+    Watches: /^for .*?(strap|bracelet|clasp|band)|strap only|strap\s+(?:for|fits?)|watch strap|mesh\b.*strap|rubber\s+(?:band|strap)|watch\s+(?:band|strap)|watch bracelet|\b\d{1,2}mm\s+bracelet\b|bracelet link|watch clasp|\bclasp\b|pusher springs?|bezel insert|dial only|\bdial\s*(?:for|part|replacement)\b|hands only|hands set|\bwatch hands\b|movement only|\bwatch movement\b|\bnh3[5-6]a?\s+watch movement\b|case\s*&\s*movement|case and movement|watch case|case part|case only|case\s*back|caseback|warranty only|crystal|watch crown|crown only|crown stem|servicing|pressure test/,
     "Vintage audio": /rebuild set|recap kit|capacitor kit|resistors?|emitter resistor|transistors?|parting out|stripped|chassis only|front chassis|tuning board|phono board|p700 board|p400 board|potentiometer|switch assembly|output jack|rectifier|muting level|pre out|main in|jumper|tone\s*arm|tonearm|headshell|stylus|cartridge|knobs?\s*(?:only|set|part)|lamp\s*(?:only|kit|part)|led lamp|light bulbs?|fuse|owners? manual|service manual|manual only|remote only|remote control|feet|dial glass|dial window|window only|speaker foam|faceplate\s*(?:only|part)/,
     Pens: /nib only|nib unit|\bfeed\b|cap only|converter|refill|cartridge|empty box|clip only/,
     Books: /poster|dvd|blu-ray|audio cd|study guide|facsimile|reprint/,
@@ -1403,7 +1497,8 @@ function compQualityReason({ result, item, category, ask }) {
   const looseMatchThreshold = category === "Books"
     ? Math.max(2, Math.ceil(importantTokens.length * 0.6))
     : Math.max(2, importantTokens.length - 1);
-  if (!strongCategoryMatch && queryCompact.length >= 8 && !titleCompact.includes(queryCompact) && matchedImportant.length < looseMatchThreshold) {
+  const normalizedQueryPhrase = queryTokens.join(" ");
+  if (!strongCategoryMatch && normalizedQueryPhrase.length >= 8 && !hasTokenBoundary(title, normalizedQueryPhrase) && matchedImportant.length < looseMatchThreshold) {
     return "Loose model match";
   }
 
@@ -1827,16 +1922,38 @@ async function buildRealCompDeal(input, searchResult) {
     throw new Error("No usable marketplace results after comp-quality filtering");
   }
 
-  const photoComparison = await comparePhotoComps(input, priced);
+  const queryConditionBucket = conditionBucketForQuery(condition, item);
+  const bucketRejected = [];
+  const bucketPriced = queryConditionBucket
+    ? priced.filter(result => {
+      const listingBucket = conditionBucketForText(`${result.title || ""} ${result.condition || ""}`);
+      const keep = listingBucket === queryConditionBucket;
+      if (!keep) {
+        bucketRejected.push({
+          ...result,
+          reason: listingBucket
+            ? `Different condition bucket: query ${queryConditionBucket}, comp ${listingBucket}`
+            : `Missing condition bucket proof for query ${queryConditionBucket}`
+        });
+      }
+      return keep;
+    })
+    : priced;
+
+  if (queryConditionBucket && bucketPriced.length < minimumAcceptedCompsFor(category)) {
+    throw new Error(`Too few same-condition ${queryConditionBucket} comps after filtering`);
+  }
+
+  const photoComparison = await comparePhotoComps(input, bucketPriced);
   const photoFiltered = photoComparison.results;
-  if (photoFiltered.length < 2) {
+  if (photoFiltered.length < minimumAcceptedCompsFor(category)) {
     throw new Error("Too few accepted marketplace results after comp-quality filtering");
   }
   const totals = photoFiltered.map(result => result.total);
   const low = percentile(totals, 0.15);
   const medianPrice = median(totals);
   const high = percentile(totals, 0.85);
-  const fastSale = ask > 0 ? Math.max(ask + 20, low * 0.97) : low * 0.97;
+  const fastSale = medianPrice;
   const floor = valuationFloor(category);
   if (floor && fastSale < floor) {
     throw new Error(`Accepted comps priced below ${category} sanity floor`);
@@ -1879,6 +1996,8 @@ async function buildRealCompDeal(input, searchResult) {
     ask,
     fastSale: Math.round(fastSale),
     allowBelowAsk: true,
+    conditionPriced: Boolean(queryConditionBucket),
+    conditionBucket: queryConditionBucket || "",
     suggestedAsk: Math.round(suggestedAsk),
     priceLow: Math.round(low),
     priceMedian: Math.round(medianPrice),
@@ -1914,7 +2033,7 @@ async function buildRealCompDeal(input, searchResult) {
         photoMatchReason: result.photoMatchReason || "",
         included: true
       })),
-      rejected: [...photoComparison.rejected, ...qualityRejected, ...(searchResult.rejected || [])].slice(0, 12).map((result, index) => ({
+      rejected: [...photoComparison.rejected, ...bucketRejected, ...qualityRejected, ...(searchResult.rejected || [])].slice(0, 12).map((result, index) => ({
         id: `rejected-${index}`,
         title: result.title,
         price: result.price || 0,
@@ -1977,7 +2096,14 @@ async function valueThroughSource(searchFn, input, category, source, limit = 36)
       attempt.accepted = Number(deal.comps || 0);
       attempts.push(attempt);
       if (Number(deal.comps || 0) < minimumAccepted) {
-        weakDeal = weakDeal || deal;
+        weakDeal = weakDeal || {
+          ...deal,
+          valuationStatus: "baseline",
+          valuationMethod: `${deal.valuationMethod || "market-comps"}-weak-evidence`,
+          researchMode: true,
+          confidence: Math.min(Number(deal.confidence || 0), 40),
+          explanation: `${deal.explanation || ""} Too few accepted comps survived the reliability gate, so this is research-only until at least ${minimumAccepted} clean comps are found.`.trim()
+        };
         continue;
       }
       return { deal: { ...deal, valuationAttempts: attempts }, attempts };
@@ -1996,9 +2122,25 @@ function shouldTryPriceCharting(category) {
 
 function priceChartingConditionPrice(product, condition, item = "") {
   const prices = product.prices || {};
+  const raw = product.raw || {};
   const text = `${condition || ""} ${item || ""}`.toLowerCase();
+  const gradeMatch = text.match(/\b(?:psa|sgc|bgs|bvg|beckett|cgc)?\s*(10|9\.5|9|8\.5|8|7\.5|7|6\.5|6|5\.5|5|4\.5|4|3\.5|3|2\.5|2|1\.5|1)\b/);
   if (/\b(psa|sgc|bgs|beckett|cgc|graded|slab|9\.8|10)\b/.test(text)) {
-    return prices.graded || prices.manualOnly || prices.loose || prices.cib || prices.new || 0;
+    if (gradeMatch) {
+      const grade = gradeMatch[1];
+      const compactGrade = grade.replace(".", "");
+      const rawKeys = [
+        `graded-${grade}-price`,
+        `graded-${compactGrade}-price`,
+        `psa-${grade}-price`,
+        `psa-${compactGrade}-price`,
+        `cgc-${grade}-price`,
+        `cgc-${compactGrade}-price`
+      ];
+      const exactRaw = rawKeys.map(key => Number(raw[key] || 0)).find(value => Number.isFinite(value) && value > 0);
+      return exactRaw ? exactRaw / 100 : 0;
+    }
+    return prices.graded || 0;
   }
   if (/\b(sealed|new|unopened|mint)\b/.test(text)) return prices.new || prices.cib || prices.loose || prices.graded || 0;
   if (/\b(box|complete|cib)\b/.test(text)) return prices.cib || prices.loose || prices.new || 0;
@@ -2021,6 +2163,9 @@ function buildPriceChartingDeal(input, product) {
   const ground = String(input.ground || "Estate sale");
   const ask = Number(input.ask || 0);
   const condition = String(input.condition || "clean");
+  if (Number(product.confidence || 0) < 70) {
+    throw new Error(`PriceCharting match confidence below threshold (${product.confidence || 0})`);
+  }
   const selected = priceChartingConditionPrice(product, condition, item);
 
   if (!selected) {
@@ -2038,8 +2183,9 @@ function buildPriceChartingDeal(input, product) {
     valuationStatus: "valued",
     valuationMethod: "catalog-price-guide",
     ask,
-    fastSale: ask > 0 ? Math.max(ask + 10, fastSale) : fastSale,
-    allowBelowAsk: ask <= 0,
+    fastSale,
+    allowBelowAsk: true,
+    conditionPriced: true,
     suggestedAsk: Math.round(selected),
     priceLow: Math.round(range.low),
     priceMedian: Math.round(range.median),
@@ -4087,5 +4233,7 @@ if (require.main === module) {
 
 module.exports = {
   buildLookupDeal,
+  compQualityReason,
+  inferCategoryFromItem,
   valuationScoreboard
 };

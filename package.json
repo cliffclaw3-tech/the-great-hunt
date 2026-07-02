@@ -6,8 +6,11 @@
     "audit:categories": "node tools/category-sweep.js",
     "audit:classifieds": "node tools/classifieds-firehose.js",
     "audit:redteam": "node tools/red-team-audit.js",
-    "audit:all": "npm run check && npm run audit:redteam && npm run audit:valuation && npm run audit:categories && npm run audit:classifieds",
-    "check": "node --check server.js && node --check app.js && node --check providers/ebay.js && node --check providers/reverb.js && node --check providers/soldComps.js && node --check providers/priceCharting.js && node --check providers/crawl4ai.js && node --check providers/productLookup.js && node --check tools/red-team-audit.js && node --check tools/valuation-audit.js && node --check tools/category-sweep.js && node --check tools/classifieds-firehose.js && node --check tools/reliability-report.js && node --check tools/wo-060-check.js && node --check tools/verify-onboarding.js",
+    "audit:all": "npm run check && npm run test:comp-quality && npm run audit:redteam && npm run audit:valuation && npm run audit:categories && npm run audit:classifieds",
+    "check": "node --check server.js && node --check app.js && node --check providers/ebay.js && node --check providers/reverb.js && node --check providers/soldComps.js && node --check providers/priceCharting.js && node --check providers/crawl4ai.js && node --check providers/productLookup.js && node --check tools/red-team-audit.js && node --check tools/valuation-audit.js && node --check tools/category-sweep.js && node --check tools/classifieds-firehose.js && node --check tools/reliability-report.js && node --check tools/wo-060-check.js && node --check tools/verify-onboarding.js && node --check tools/comp-quality-unit.js && node --check tools/deploy-railway.js",
+    "test:comp-quality": "node tools/comp-quality-unit.js",
+    "deploy:railway": "node tools/deploy-railway.js",
+    "deploy:railway:check": "node tools/deploy-railway.js --dry-run",
     "verify:onboarding": "node tools/verify-onboarding.js",
     "check:wo060": "node tools/wo-060-check.js"
   },

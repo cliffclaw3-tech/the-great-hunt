@@ -23,7 +23,13 @@ const cases = [
   { persona: "investor", item: "Amazing Spider-Man 300 comic", category: "Comic books" },
   { persona: "investor", item: "Morgan silver dollar 1881 S", category: "Coins" },
   { persona: "investor", item: "signed ceramic vase bottom mark", category: "Vases and pottery" },
-  { persona: "investor", item: "Rolex Submariner watch", category: "Watches" }
+  { persona: "investor", item: "Rolex Submariner watch", category: "Watches" },
+  { persona: "collector", item: "Super Mario 64 Nintendo 64 complete in box", category: "Video games" },
+  { persona: "collector", item: "Super Mario 64", category: "Video games" },
+  { persona: "collector", item: "Super Mario 64 DS Nintendo DS", category: "Video games" },
+  { persona: "collector", item: "Super Mario 64 Nintendo 64 complete in box", category: "Video games", ask: 999 },
+  { persona: "garage-sale", item: "one-off handmade unlabeled shelf doodad", category: "Mixed sale", ask: 500 },
+  { persona: "collector", item: "Mario Kart Nintendo 64 complete in box", category: "Video games" }
 ];
 
 const dirtyCompPattern = /\b(for parts|parts only|repair|spares|strap|watch band|rubber band|bracelet only|clasp|crown|caseback|case back|knob|finials?|lamp base|socket only|cord only|harp only|flawed|flaws|repair kit|recap kit|capacitor kit|filter kit|accessory kit|lamp kit|board|resistor|capacitor|manual only|box only|pencil set|ballpoint|reprint|commemorative|porcelain|facsimile|novelty|pick your card|you pick|vending machine)\b/i;
@@ -43,6 +49,8 @@ const fastSaleFloors = {
   Lighting: 15,
   Furniture: 25
 };
+
+const CASE_TIMEOUT_MS = Number(process.env.VALUATION_AUDIT_CASE_TIMEOUT_MS || 45000);
 
 const minimumCompCounts = {
   "Sports cards": 3,
@@ -90,7 +98,7 @@ async function auditCase(testCase) {
     category: testCase.category,
     ground: "Estate sale",
     condition: "clean",
-    ask: 0,
+    ask: Number(testCase.ask || 0),
     distance: 3
   });
   const elapsedMs = Date.now() - started;
@@ -111,6 +119,7 @@ async function auditCase(testCase) {
     comps: Number(deal.comps || 0),
     fastSale: Number(deal.fastSale || 0),
     confidence: Number(deal.confidence || 0),
+    acceptedTitles: (deal.compReview?.accepted || []).map(comp => comp.title || ""),
     elapsedMs,
     dirtyAccepted: dirty.length,
     dirtyExamples: dirty,
@@ -119,6 +128,66 @@ async function auditCase(testCase) {
     suspiciousLow: deal.valuationStatus === "valued" && Number(deal.fastSale || 0) < Number(fastSaleFloors[testCase.category] || 0),
     weakEvidence
   };
+}
+
+function timeoutCase(testCase) {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve({
+        item: testCase.item,
+        persona: testCase.persona || "general",
+        category: testCase.category,
+        status: "unknown",
+        method: "audit-timeout",
+        source: "",
+        comps: 0,
+        fastSale: 0,
+        confidence: 0,
+        acceptedTitles: [],
+        elapsedMs: CASE_TIMEOUT_MS,
+        dirtyAccepted: 0,
+        dirtyExamples: [],
+        fieldChecks: 0,
+        missingFieldCheck: true,
+        missingResearchGuidance: false,
+        suspiciousLow: false,
+        weakEvidence: false,
+        error: `Timed out after ${Math.round(CASE_TIMEOUT_MS / 1000)}s`
+      });
+    }, CASE_TIMEOUT_MS);
+  });
+}
+
+function auditCaseWithTimeout(testCase) {
+  return Promise.race([
+    auditCase(testCase),
+    timeoutCase(testCase)
+  ]);
+}
+
+function acceptanceFlags(row) {
+  const item = String(row.item || "").toLowerCase();
+  const status = String(row.status || "").toLowerCase();
+  const source = String(row.source || "").toLowerCase();
+  const method = String(row.method || "").toLowerCase();
+  const isResearch = status === "baseline" || method.includes("weak-evidence") || method.includes("baseline");
+  const acceptedTitles = (row.acceptedTitles || []).join(" ").toLowerCase();
+
+  if (item === "super mario 64") {
+    return isResearch ? [] : ["Bare Super Mario 64 should route to Research/disambiguate"];
+  }
+
+  if (item.includes("nintendo 64") && item.includes("super mario 64")) {
+    const hasDsEvidence = /\bds\b|nintendo ds/.test(acceptedTitles);
+    return hasDsEvidence ? ["N64 Mario accepted DS evidence"] : [];
+  }
+
+  if (item.includes("nintendo ds")) {
+    const ok = source || method || status;
+    return ok ? [] : ["DS control did not return a meaningful status"];
+  }
+
+  return [];
 }
 
 function coverage(rows) {
@@ -133,6 +202,7 @@ function coverage(rows) {
   const slow = rows.filter(row => Number(row.elapsedMs || 0) > 9000).length;
   const missingFieldCheck = rows.filter(row => row.missingFieldCheck).length;
   const missingResearchGuidance = rows.filter(row => row.missingResearchGuidance).length;
+  const acceptanceFailures = rows.reduce((sum, row) => sum + acceptanceFlags(row).length, 0);
 
   return {
     total,
@@ -146,6 +216,7 @@ function coverage(rows) {
     slow,
     missingFieldCheck,
     missingResearchGuidance,
+    acceptanceFailures,
     coverage: total ? Math.round(((valued + noValue) / total) * 100) : 0,
     cleanCoverage: total ? Math.round(((valued + noValue - dirty - suspiciousLow - weakEvidence - missingFieldCheck - missingResearchGuidance) / total) * 100) : 0
   };
@@ -167,15 +238,26 @@ async function main() {
   const rows = [];
   for (const testCase of cases) {
     try {
-      rows.push(await auditCase(testCase));
+      rows.push(await auditCaseWithTimeout(testCase));
     } catch (error) {
       rows.push({
         item: testCase.item,
+        persona: testCase.persona || "general",
         category: testCase.category,
         status: "error",
+        method: "audit-error",
         error: error.message,
+        comps: 0,
+        fastSale: 0,
+        confidence: 0,
+        acceptedTitles: [],
         dirtyAccepted: 0,
-        dirtyExamples: []
+        dirtyExamples: [],
+        fieldChecks: 0,
+        missingFieldCheck: true,
+        missingResearchGuidance: false,
+        suspiciousLow: false,
+        weakEvidence: false
       });
     }
     await new Promise(resolve => setTimeout(resolve, 650));
@@ -190,14 +272,15 @@ async function main() {
     failed: summary.total - summary.valued - summary.noValue,
     coverage: summary.coverage,
     cleanCoverage: summary.cleanCoverage,
-    ready: summary.coverage >= 90 && summary.cleanCoverage >= 90 && summary.dirty === 0 && summary.suspiciousLow === 0 && summary.weakEvidence === 0 && summary.missingFieldCheck === 0 && summary.missingResearchGuidance === 0,
+    ready: summary.coverage >= 90 && summary.cleanCoverage >= 90 && summary.dirty === 0 && summary.suspiciousLow === 0 && summary.weakEvidence === 0 && summary.missingFieldCheck === 0 && summary.missingResearchGuidance === 0 && summary.acceptanceFailures === 0,
     risks: ["garage-sale lookups", "collector precision", "investor categories", "dirty comps", "weak evidence"],
     failures: [
       ...rows.filter(row => row.dirtyAccepted).map(row => ({ item: row.item, reason: "Dirty accepted comp", examples: row.dirtyExamples })),
       ...rows.filter(row => row.suspiciousLow).map(row => ({ item: row.item, reason: "Suspiciously low valuation", fastSale: row.fastSale })),
       ...rows.filter(row => row.weakEvidence).map(row => ({ item: row.item, reason: "Weak evidence", comps: row.comps, confidence: row.confidence })),
       ...rows.filter(row => row.missingFieldCheck).map(row => ({ item: row.item, reason: "Missing field-check links" })),
-      ...rows.filter(row => row.missingResearchGuidance).map(row => ({ item: row.item, reason: "Missing research guidance" }))
+      ...rows.filter(row => row.missingResearchGuidance).map(row => ({ item: row.item, reason: "Missing research guidance" })),
+      ...rows.flatMap(row => acceptanceFlags(row).map(reason => ({ item: row.item, reason })))
     ],
     personas: personaCoverage(rows)
   });
@@ -216,7 +299,8 @@ async function main() {
     low: row.suspiciousLow ? "yes" : "",
     weak: row.weakEvidence ? "yes" : "",
     noField: row.missingFieldCheck ? "yes" : "",
-    noGuide: row.missingResearchGuidance ? "yes" : ""
+    noGuide: row.missingResearchGuidance ? "yes" : "",
+    accept: acceptanceFlags(row).join("; ")
   })));
   console.log(JSON.stringify({
     summary,
@@ -225,10 +309,11 @@ async function main() {
     suspiciousLow: rows.filter(row => row.suspiciousLow).map(row => ({ item: row.item, fastSale: row.fastSale, floor: fastSaleFloors[row.category] })),
     weakEvidence: rows.filter(row => row.weakEvidence).map(row => ({ item: row.item, comps: row.comps, confidence: row.confidence })),
     missingFieldCheck: rows.filter(row => row.missingFieldCheck).map(row => ({ item: row.item, fieldChecks: row.fieldChecks })),
-    missingResearchGuidance: rows.filter(row => row.missingResearchGuidance).map(row => ({ item: row.item }))
+    missingResearchGuidance: rows.filter(row => row.missingResearchGuidance).map(row => ({ item: row.item })),
+    acceptanceFailures: rows.flatMap(row => acceptanceFlags(row).map(reason => ({ item: row.item, reason })))
   }, null, 2));
 
-  if (summary.coverage < 90 || summary.cleanCoverage < 90 || summary.dirty > 0 || summary.suspiciousLow > 0 || summary.weakEvidence > 0 || summary.missingFieldCheck > 0 || summary.missingResearchGuidance > 0) {
+  if (summary.coverage < 90 || summary.cleanCoverage < 90 || summary.dirty > 0 || summary.suspiciousLow > 0 || summary.weakEvidence > 0 || summary.missingFieldCheck > 0 || summary.missingResearchGuidance > 0 || summary.acceptanceFailures > 0) {
     process.exitCode = 1;
   }
 }
@@ -236,4 +321,6 @@ async function main() {
 main().catch(error => {
   console.error(error);
   process.exitCode = 1;
+}).finally(() => {
+  process.exit(process.exitCode || 0);
 });

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-06-27T15:19:26.481Z",
+  "updatedAt": "2026-07-02T19:31:38.550Z",
   "suites": {
     "redTeam": {
       "label": "Red-team sweep",
@@ -72,11 +72,11 @@
     "valuation": {
       "label": "Valuation audit",
       "command": "npm run audit:valuation",
-      "total": 22,
-      "passed": 22,
-      "failed": 0,
-      "coverage": 100,
-      "cleanCoverage": 100,
+      "total": 28,
+      "passed": 26,
+      "failed": 2,
+      "coverage": 93,
+      "cleanCoverage": 93,
       "ready": true,
       "risks": [
         "garage-sale lookups",
@@ -89,10 +89,10 @@
       "personas": [
         {
           "persona": "garage-sale",
-          "total": 8,
+          "total": 9,
           "valued": 8,
           "noValue": 0,
-          "baseline": 0,
+          "baseline": 1,
           "unknown": 0,
           "dirty": 0,
           "suspiciousLow": 0,
@@ -100,15 +100,16 @@
           "slow": 0,
           "missingFieldCheck": 0,
           "missingResearchGuidance": 0,
-          "coverage": 100,
-          "cleanCoverage": 100
+          "acceptanceFailures": 0,
+          "coverage": 89,
+          "cleanCoverage": 89
         },
         {
           "persona": "collector",
-          "total": 6,
-          "valued": 6,
+          "total": 11,
+          "valued": 10,
           "noValue": 0,
-          "baseline": 0,
+          "baseline": 1,
           "unknown": 0,
           "dirty": 0,
           "suspiciousLow": 0,
@@ -116,8 +117,9 @@
           "slow": 0,
           "missingFieldCheck": 0,
           "missingResearchGuidance": 0,
-          "coverage": 100,
-          "cleanCoverage": 100
+          "acceptanceFailures": 0,
+          "coverage": 91,
+          "cleanCoverage": 91
         },
         {
           "persona": "investor",
@@ -132,11 +134,12 @@
           "slow": 0,
           "missingFieldCheck": 0,
           "missingResearchGuidance": 0,
+          "acceptanceFailures": 0,
           "coverage": 100,
           "cleanCoverage": 100
         }
       ],
-      "updatedAt": "2026-06-27T15:17:53.569Z"
+      "updatedAt": "2026-07-02T19:31:38.552Z"
     },
     "categories": {
       "label": "Category sweep",

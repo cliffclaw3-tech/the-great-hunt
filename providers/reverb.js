@@ -44,6 +44,13 @@ function parseMoney(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function moneyCurrency(value) {
+  if (value && typeof value === "object") {
+    return value.currency || value.currency_code || value.currencyCode || "USD";
+  }
+  return "USD";
+}
+
 function confidenceScore({ query, item }) {
   const title = String(item.title || "").toLowerCase();
   const queryTokens = tokenize(query);
@@ -65,6 +72,8 @@ function confidenceScore({ query, item }) {
 function normalizeListing(item, query) {
   const price = parseMoney(item.price);
   const shipping = parseMoney(item.shipping?.rate) || parseMoney(item.shipping?.us_rate) || 0;
+  const currency = moneyCurrency(item.price);
+  const shippingCurrency = moneyCurrency(item.shipping?.rate || item.shipping?.us_rate);
 
   return {
     title: item.title || "Untitled Reverb listing",
@@ -76,6 +85,8 @@ function normalizeListing(item, query) {
     image: item.photos?.[0]?._links?.large_crop?.href || item.photos?.[0]?._links?.full?.href || null,
     soldDate: null,
     confidence: confidenceScore({ query, item }),
+    currency,
+    shippingCurrency,
     buyingOptions: ["FIXED_PRICE"]
   };
 }
@@ -111,8 +122,9 @@ async function searchReverb({ item, category, limit = 20 }) {
     .map(listing => normalizeListing(listing, query))
     .filter(listing => {
       const reason = filterReason(listing.title, queryTokens);
-      if (reason || listing.price === null || !listing.url) {
-        rejected.push({ ...listing, reason: reason || "Missing price or URL" });
+      const currencyMismatch = listing.currency !== "USD" || listing.shippingCurrency !== "USD";
+      if (reason || listing.price === null || !listing.url || currencyMismatch) {
+        rejected.push({ ...listing, reason: reason || (currencyMismatch ? "Non-USD listing" : "Missing price or URL") });
         return false;
       }
       return true;

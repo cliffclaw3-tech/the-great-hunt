@@ -1836,7 +1836,9 @@ function renderDeals() {
 }
 
 function dealVerdict(deal) {
-  if (deal.researchMode && Number(deal.comps || 0) <= 0) {
+  const status = String(deal.valuationStatus || "").toLowerCase();
+  const method = String(deal.valuationMethod || "").toLowerCase();
+  if (deal.researchMode || status === "baseline" || method.includes("fallback") || method.includes("baseline")) {
     return {
       label: "Research mode",
       tone: "maybe",
@@ -1853,6 +1855,14 @@ function dealVerdict(deal) {
   }
 
   const math = dealMath(deal);
+  if (Number(deal.ask || 0) > 0 && Number(deal.fastSale || 0) < Number(deal.ask || 0)) {
+    return {
+      label: "Skip — sells below ask",
+      tone: "skip",
+      copy: "Accepted comps point below the seller's ask. Do not let the asking price anchor the value."
+    };
+  }
+
   if (math.profit >= 250 && math.margin >= 20 && Number(deal.comps || 0) >= 4) {
     return {
       label: "Worth a closer look",
@@ -1914,6 +1924,7 @@ function dealActionPlan(deal) {
 function inferCategoryFromItem(item) {
   const text = item.toLowerCase();
   const rules = [
+    [/nintendo|super mario|zelda|pokemon|pokémon|\bn64\b|gamecube|game cube|game boy|gameboy|\bgba\b|\bgbc\b|\bnes\b|\bsnes\b|nintendo ds|\b3ds\b|switch|playstation|\bps[1-5]\b|xbox|sega|genesis|dreamcast|saturn|video game|game cartridge|cartridge only|disc only|complete in box|\bcib\b/, "Video games"],
     [/shoe|shoes|sneaker|sneakers|tennis shoe|running shoe|trainer|cleat|boot|boots|sandal|sandals|nike|adidas|new balance|asics|brooks|hoka|skechers|puma|reebok|converse|vans/, "Retail arbitrage"],
     [/apparel|clothing|shirt|pants|jacket|coat|dress|jeans|hoodie|sweater|sweatshirt|shorts|socks|hat|cap|size \d+|mens|women'?s|kids/, "Retail arbitrage"],
     [/painting|fine art|\bart\b|artist|canvas|oil painting|watercolor|lithograph|serigraph|signed print|framed art|sculpture|gallery label|provenance/, "Art and paintings"],
@@ -1953,6 +1964,7 @@ function categoryFallbackValue(category, item = "") {
     Tools: 35,
     Cameras: 75,
     "Retail arbitrage": 28,
+    "Video games": 35,
     "Comic books": 35,
     "Sports cards": 25,
     "Sports memorabilia": 50,
