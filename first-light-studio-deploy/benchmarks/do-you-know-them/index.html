@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Do You Know Them?</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #FFF8E8;
+    --card-bg: #FFFFFF;
+    --card-border: #E8D8B0;
+    --accent: #F0A030;
+    --correct: #3CAE52;
+    --incorrect: #E84040;
+    --text-dark: #1A1A4A;
+    --text-mid: #4A4A6A;
+    --streak: #FF6820;
+    --shadow: rgba(0,0,0,0.15);
+  }
+
+  body {
+    background: var(--bg);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    overflow: hidden;
+  }
+
+  #game-container {
+    width: 390px;
+    max-width: 100vw;
+    height: 100vh;
+    max-height: 844px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ── TOP BAR ── */
+  #top-bar {
+    height: 80px;
+    background: linear-gradient(135deg, #F5EDD0, #FAF4E0);
+    border-bottom: 2px solid var(--card-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+
+  #person-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--accent);
+    border-radius: 24px;
+    padding: 6px 14px;
+    box-shadow: 0 2px 8px rgba(240,160,48,0.3);
+  }
+
+  #person-avatar {
+    font-size: 24px;
+    line-height: 1;
+  }
+
+  #person-label {
+    font-size: 13px;
+    color: #fff;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  #person-name-display {
+    font-size: 16px;
+    color: #fff;
+    font-weight: 800;
+  }
+
+  #score-area {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+
+  #score-display {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text-dark);
+  }
+
+  #streak-display {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--streak);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  #streak-display.active { opacity: 1; }
+
+  #question-counter {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: var(--text-mid);
+    font-weight: 500;
+  }
+
+  /* ── QUESTION ZONE ── */
+  #question-zone {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #question-card {
+    width: 100%;
+    max-width: 340px;
+    background: var(--card-bg);
+    border: 2.5px solid var(--card-border);
+    border-radius: 20px;
+    padding: 28px 24px 24px;
+    box-shadow: 0 6px 24px var(--shadow), 0 2px 6px rgba(0,0,0,0.08);
+    position: relative;
+    overflow: hidden;
+  }
+
+  #question-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, var(--accent), #FFD060);
+    border-radius: 20px 20px 0 0;
+  }
+
+  #question-text {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-dark);
+    line-height: 1.35;
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  #question-text .highlight {
+    color: var(--accent);
+  }
+
+  #card-decoration {
+    text-align: center;
+    font-size: 28px;
+    margin-bottom: 12px;
+    opacity: 0.6;
+  }
+
+  /* ── ANSWER ZONE ── */
+  #answer-zone {
+    height: 200px;
+    padding: 0 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  #action-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 176px;
+    transform: translateX(-50%);
+    z-index: 12;
+    width: 300px;
+    padding: 8px 12px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.84);
+    border: 2px solid rgba(232, 216, 176, 0.9);
+    color: var(--text-mid);
+    font-size: 13px;
+    font-weight: 800;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    pointer-events: none;
+  }
+
+  #action-hint.ready {
+    color: #2454A8;
+    border-color: rgba(64, 128, 232, 0.45);
+    background: #F0F5FF;
+  }
+
+  .answer-card {
+    background: var(--card-bg);
+    border: 2.5px solid var(--card-border);
+    border-radius: 14px;
+    padding: 12px 20px;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text-dark);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .answer-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  }
+
+  .answer-card.selected {
+    border-color: #4080E8;
+    border-width: 3px;
+    background: #F0F5FF;
+    box-shadow: 0 0 0 4px rgba(64,128,232,0.15), 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  .answer-card.pulse-glow {
+    animation: pulseGlow 0.8s ease-in-out infinite;
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(240,160,48,0); }
+    50% { box-shadow: 0 0 0 8px rgba(240,160,48,0.35); }
+  }
+
+  .answer-card .card-emoji {
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  /* ── LOCK IN BUTTON ── */
+  #lock-in-btn {
+    position: absolute;
+    bottom: 220px;
+    left: 50%;
+    transform: translateX(-50%) scale(0);
+    background: linear-gradient(135deg, #4080E8, #6060D8);
+    color: #fff;
+    font-size: 17px;
+    font-weight: 800;
+    border: none;
+    border-radius: 32px;
+    padding: 14px 40px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(64,96,216,0.4);
+    letter-spacing: 0.5px;
+    z-index: 20;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ── CARD FLIP OVERLAY ── */
+  #flip-overlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 30;
+    background: rgba(255,248,232,0.6);
+    backdrop-filter: blur(2px);
+  }
+
+  #flip-overlay.active { display: flex; }
+
+  .flip-card-container {
+    perspective: 800px;
+    width: 300px;
+    height: 180px;
+  }
+
+  .flip-card-inner {
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    position: relative;
+  }
+
+  .flip-card-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  }
+
+  .flip-card-back {
+    background: linear-gradient(135deg, #C8A840, #E8D020);
+    transform: rotateY(180deg);
+  }
+
+  .flip-card-back::after {
+    content: '?';
+    font-size: 64px;
+    color: rgba(255,255,255,0.5);
+    font-weight: 900;
+  }
+
+  .flip-card-front {
+    background: var(--card-bg);
+    border: 3px solid var(--card-border);
+    padding: 20px;
+    text-align: center;
+  }
+
+  .flip-card-front .reveal-text {
+    font-size: 15px;
+    color: var(--text-mid);
+    font-weight: 500;
+  }
+
+  .flip-card-front .reveal-answer {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text-dark);
+  }
+
+  .flip-card-front .reveal-icon {
+    font-size: 36px;
+  }
+
+  /* ── FEEDBACK PHRASES ── */
+  #feedback-phrase {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    font-size: 22px;
+    font-weight: 900;
+    text-align: center;
+    pointer-events: none;
+    z-index: 40;
+    white-space: nowrap;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    padding: 10px 20px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.95);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  }
+
+  /* ── RESULTS SCREEN ── */
+  #results-screen {
+    position: absolute;
+    inset: 0;
+    background: var(--bg);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    z-index: 50;
+    text-align: center;
+  }
+
+  #results-screen.active { display: flex; }
+
+  .results-emoji { font-size: 72px; margin-bottom: 16px; }
+
+  .results-title {
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--text-dark);
+    margin-bottom: 8px;
+  }
+
+  .results-score {
+    font-size: 56px;
+    font-weight: 900;
+    color: var(--accent);
+    margin: 12px 0;
+  }
+
+  .results-label {
+    font-size: 16px;
+    color: var(--text-mid);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .results-tier {
+    font-size: 18px;
+    color: var(--text-dark);
+    font-weight: 700;
+    padding: 12px 20px;
+    background: rgba(240,160,48,0.12);
+    border-radius: 12px;
+    margin: 12px 0 28px;
+    max-width: 280px;
+  }
+
+  .replay-btn {
+    background: linear-gradient(135deg, var(--accent), #FFD060);
+    color: var(--text-dark);
+    font-size: 18px;
+    font-weight: 800;
+    border: none;
+    border-radius: 32px;
+    padding: 16px 48px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(240,160,48,0.4);
+    letter-spacing: 0.3px;
+    margin-bottom: 12px;
+  }
+
+  .try-another-btn {
+    background: none;
+    color: var(--text-mid);
+    font-size: 15px;
+    font-weight: 600;
+    border: 2px solid var(--card-border);
+    border-radius: 24px;
+    padding: 10px 28px;
+    cursor: pointer;
+  }
+
+  /* ── PARTICLES ── */
+  .particle {
+    position: absolute;
+    pointer-events: none;
+    border-radius: 50%;
+    z-index: 35;
+  }
+
+  /* ── CONFETTI ── */
+  .confetti-piece {
+    position: absolute;
+    pointer-events: none;
+    z-index: 35;
+    border-radius: 2px;
+    width: 8px;
+    height: 8px;
+  }
+
+  /* ── NEXT BUTTON ── */
+  #next-btn {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) scale(0);
+    background: linear-gradient(135deg, var(--accent), #FFD060);
+    color: var(--text-dark);
+    font-size: 17px;
+    font-weight: 800;
+    border: none;
+    border-radius: 32px;
+    padding: 14px 40px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(240,160,48,0.35);
+    z-index: 20;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ── SCREEN FLASH ── */
+  #screen-flash {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 45;
+    opacity: 0;
+  }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+
+  <!-- Screen flash overlay -->
+  <div id="screen-flash"></div>
+
+  <!-- TOP BAR -->
+  <div id="top-bar">
+    <div id="person-display">
+      <span id="person-avatar">🧑</span>
+      <div>
+        <div id="person-label">Predicting</div>
+        <div id="person-name-display">Jake</div>
+      </div>
+    </div>
+    <div id="score-area">
+      <div id="score-display">Score: 0</div>
+      <div id="streak-display">🔥 ×<span id="streak-count">0</span></div>
+    </div>
+    <div id="question-counter">Q <span id="q-num">1</span> / 10</div>
+  </div>
+
+  <!-- QUESTION ZONE -->
+  <div id="question-zone">
+    <div id="question-card">
+      <div id="card-decoration">🎯</div>
+      <div id="question-text">Loading...</div>
+    </div>
+  </div>
+
+  <!-- ANSWER ZONE -->
+  <div id="answer-zone"></div>
+  <div id="action-hint">Pick the answer you think they chose.</div>
+
+  <!-- LOCK IN BUTTON -->
+  <button id="lock-in-btn" onclick="lockIn()">Lock In 🔒</button>
+
+  <!-- NEXT BUTTON -->
+  <button id="next-btn" onclick="nextQuestion()">Next →</button>
+
+  <!-- CARD FLIP OVERLAY -->
+  <div id="flip-overlay">
+    <div class="flip-card-container">
+      <div class="flip-card-inner" id="flip-inner">
+        <div class="flip-card-face flip-card-front" id="flip-front">
+          <div class="reveal-icon" id="flip-icon">✓</div>
+          <div class="reveal-text" id="flip-reveal-text">They said:</div>
+          <div class="reveal-answer" id="flip-answer-text">Pizza</div>
+        </div>
+        <div class="flip-card-face flip-card-back"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEEDBACK PHRASE -->
+  <div id="feedback-phrase"></div>
+
+  <!-- RESULTS SCREEN -->
+  <div id="results-screen">
+    <div class="results-emoji" id="results-emoji">🎯</div>
+    <div class="results-title">Round Complete!</div>
+    <div class="results-score" id="results-score">7/10</div>
+    <div class="results-label">You got <span id="results-correct">7</span> out of 10 right</div>
+    <div class="results-tier" id="results-tier">Pretty solid — you pay attention!</div>
+    <button class="replay-btn" onclick="resetGame()">Play Again 🔄</button>
+    <button class="try-another-btn" onclick="resetGame()">Try Another Person</button>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// QUESTION BANK — 18 questions, 2+ surprising answers
+// ══════════════════════════════════════════════════════
+const QUESTIONS = [
+  {
+    personName: "Jake", personAvatar: "🧑", emoji: "🍕",
+    question: "Would Jake rather eat pizza or sushi for a week straight?",
+    options: ["🍕 Pizza", "🍣 Sushi"],
+    correctIndex: 1,
+    surpriseFactor: true // Surprising: most expect pizza
+  },
+  {
+    personName: "Jake", personAvatar: "🧑", emoji: "🌅",
+    question: "Is Jake a morning person or a night owl?",
+    options: ["🌅 Morning person", "🦉 Night owl"],
+    correctIndex: 0,
+    surpriseFactor: false
+  },
+  {
+    personName: "Jake", personAvatar: "🧑", emoji: "🎬",
+    question: "Jake's ideal Friday night — movie at home or going out?",
+    options: ["🎬 Movie at home", "🎉 Going out"],
+    correctIndex: 0,
+    surpriseFactor: false
+  },
+  {
+    personName: "Jake", personAvatar: "🧑", emoji: "😱",
+    question: "Jake's biggest fear — public speaking or heights?",
+    options: ["🎤 Public speaking", "🏔️ Heights"],
+    correctIndex: 1,
+    surpriseFactor: false
+  },
+  {
+    personName: "Jake", personAvatar: "🧑", emoji: "💰",
+    question: "If Jake won $10,000 tomorrow, they'd spend it or save it?",
+    options: ["💸 Spend it", "🏦 Save it"],
+    correctIndex: 1,
+    surpriseFactor: false
+  },
+  {
+    personName: "Sam", personAvatar: "😄", emoji: "🐶",
+    question: "Is Sam more of a dog person or a cat person?",
+    options: ["🐶 Dog person", "🐱 Cat person"],
+    correctIndex: 1,
+    surpriseFactor: true // Surprising: Sam looks like a dog person
+  },
+  {
+    personName: "Sam", personAvatar: "😄", emoji: "🏖️",
+    question: "Sam's dream vacation — beach or mountains?",
+    options: ["🏖️ Beach", "⛰️ Mountains"],
+    correctIndex: 0,
+    surpriseFactor: false
+  },
+  {
+    personName: "Sam", personAvatar: "😄", emoji: "📱",
+    question: "Would Sam rather go a week without their phone or TV?",
+    options: ["📱 No phone", "📺 No TV"],
+    correctIndex: 0,
+    surpriseFactor: false
+  },
+  {
+    personName: "Sam", personAvatar: "😄", emoji: "🎵",
+    question: "Sam's workout playlist: pop or hip-hop?",
+    options: ["🎵 Pop", "🎤 Hip-hop"],
+    correctIndex: 1,
+    surpriseFactor: false
+  },
+  {
+    personName: "Sam", personAvatar: "😄", emoji: "☕",
+    question: "Does Sam prefer coffee or tea in the morning?",
+    options: ["☕ Coffee", "🍵 Tea"],
+    correctIndex: 0,
+    surpriseFactor: false
+  },
+  {
+    personName: "Alex", personAvatar: "🧢", emoji: "🎯",
+    question: "Alex's go-to stress relief — exercise or video games?",
+    options: ["🏃 Exercise", "🎮 Video games"],
+    correctIndex: 0,
+    surpriseFactor: false
+  },
+  {
+    personName: "Alex", personAvatar: "🧢", emoji: "🌮",
+    question: "For Alex's birthday dinner — fancy restaurant or tacos?",
+    options: ["🍽️ Fancy restaurant", "🌮 Tacos with everyone"],
+    correctIndex: 1,
+    surpriseFactor: true // Surprising: Alex seems fancy
+  },
+  {
+    personName: "Alex", personAvatar: "🧢", emoji: "📚",
+    question: "Alex finishes a book in one sitting or takes their time?",
+    options: ["📖 One sitting", "🐢 Takes their time"],
+    correctIndex: 0,
+    surpriseFactor: false
+  },
+  {
+    personName: "Alex", personAvatar: "🧢", emoji: "🌧️",
+    question: "Alex thinks rainy days are cozy or annoying?",
+    options: ["☁️ Cozy & perfect", "😒 Annoying"],
+    correctIndex: 0,
+    surpriseFactor: false
+  },
+  {
+    personName: "Alex", personAvatar: "🧢", emoji: "🤝",
+    question: "Alex prefers working in a team or flying solo?",
+    options: ["🤝 Team player", "🦅 Solo"],
+    correctIndex: 1,
+    surpriseFactor: true
+  },
+  {
+    personName: "Riley", personAvatar: "🌟", emoji: "🎨",
+    question: "Riley's creative outlet — art/music or writing?",
+    options: ["🎨 Art / Music", "✍️ Writing"],
+    correctIndex: 0,
+    surpriseFactor: false
+  },
+  {
+    personName: "Riley", personAvatar: "🌟", emoji: "🗺️",
+    question: "Riley's travel style — planned itinerary or spontaneous?",
+    options: ["📋 Planned out", "🎲 Totally spontaneous"],
+    correctIndex: 1,
+    surpriseFactor: false
+  },
+  {
+    personName: "Riley", personAvatar: "🌟", emoji: "🍦",
+    question: "Does Riley choose ice cream or cake at a party?",
+    options: ["🍦 Ice cream", "🎂 Cake"],
+    correctIndex: 0,
+    surpriseFactor: false
+  }
+];
+
+// ══════════════════════════════════════════════════════
+// PHRASE POOLS
+// ══════════════════════════════════════════════════════
+const CORRECT_PHRASES = [
+  "Nailed it! 🎯",
+  "You know them! ✨",
+  "Called it! 🔮",
+  "Spot on! 💫",
+  "You read them well!",
+  "Perfect! 🌟"
+];
+
+const INCORRECT_PHRASES = [
+  "Oops 😬",
+  "Not quite…",
+  "Close! Maybe? 👀",
+  "Plot twist! 🤷",
+  "Who knew? 🤯",
+  "Hmm… 💭"
+];
+
+const STREAK_PHRASES = [
+  "On a roll! 🔥",
+  "You're on fire! 🔥",
+  "Unstoppable! 💫",
+  "Can't stop you! 🎯"
+];
+
+// ══════════════════════════════════════════════════════
+// GAME STATE
+// ══════════════════════════════════════════════════════
+let state = {
+  questions: [],
+  currentIndex: 0,
+  score: 0,
+  streak: 0,
+  maxStreak: 0,
+  correctCount: 0,
+  selectedIndex: null,
+  isRevealing: false,
+  isFirstQuestion: true,
+  lastCorrectPhraseIdx: -1,
+  lastIncorrectPhraseIdx: -1
+};
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+function initGame() {
+  // Shuffle and take 10 questions
+  const shuffled = [...QUESTIONS].sort(() => Math.random() - 0.5);
+  state.questions = shuffled.slice(0, 10);
+  state.currentIndex = 0;
+  state.score = 0;
+  state.streak = 0;
+  state.selectedIndex = null;
+  state.isRevealing = false;
+  state.isFirstQuestion = true;
+
+  document.getElementById('results-screen').classList.remove('active');
+  updateScoreDisplay();
+  updateStreakDisplay();
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = state.questions[state.currentIndex];
+
+  // Update top bar
+  document.getElementById('person-avatar').textContent = q.personAvatar;
+  document.getElementById('person-name-display').textContent = q.personName;
+  document.getElementById('q-num').textContent = state.currentIndex + 1;
+  document.getElementById('card-decoration').textContent = q.emoji;
+
+  // Animate question card entrance
+  const card = document.getElementById('question-card');
+  gsap.fromTo(card,
+    { y: 60, opacity: 0 },
+    { y: 0, opacity: 1, duration: 0.35, ease: 'back.out(1.4)' }
+  );
+
+  // Set question text
+  document.getElementById('question-text').innerHTML = q.question;
+
+  // Build answer cards
+  const answerZone = document.getElementById('answer-zone');
+  answerZone.innerHTML = '';
+  state.selectedIndex = null;
+  setActionHint('Pick the answer you think they chose.', false);
+
+  q.options.forEach((opt, i) => {
+    const card = document.createElement('div');
+    card.className = 'answer-card';
+    card.dataset.index = i;
+    card.innerHTML = `<span class="card-emoji">${opt.split(' ')[0]}</span><span>${opt.split(' ').slice(1).join(' ')}</span>`;
+    card.onclick = () => selectCard(i);
+    answerZone.appendChild(card);
+
+    // Stagger entrance
+    gsap.fromTo(card,
+      { y: 30, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.3, delay: 0.1 + i * 0.08, ease: 'back.out(1.2)' }
+    );
+  });
+
+  // Hide lock-in and next buttons
+  gsap.to('#lock-in-btn', { scale: 0, duration: 0.15 });
+  gsap.to('#next-btn', { scale: 0, duration: 0.15 });
+
+  // First question: pulse glow on answer cards
+  if (state.isFirstQuestion) {
+    setTimeout(() => {
+      document.querySelectorAll('.answer-card').forEach(c => c.classList.add('pulse-glow'));
+      setTimeout(() => {
+        document.querySelectorAll('.answer-card').forEach(c => c.classList.remove('pulse-glow'));
+      }, 3000);
+    }, 600);
+    state.isFirstQuestion = false;
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// INPUT
+// ══════════════════════════════════════════════════════
+function selectCard(index) {
+  if (state.isRevealing) return;
+
+  state.selectedIndex = index;
+
+  // Remove previous selection
+  document.querySelectorAll('.answer-card').forEach(c => {
+    c.classList.remove('selected');
+    c.classList.remove('pulse-glow');
+  });
+
+  const card = document.querySelectorAll('.answer-card')[index];
+  card.classList.add('selected');
+  setActionHint('Good. Now tap Lock In to reveal their answer.', true);
+
+  // Animate selection
+  gsap.fromTo(card, { scale: 1 }, { scale: 1.04, duration: 0.12, yoyo: true, repeat: 1, ease: 'power2.out' });
+
+  // Show lock-in button
+  gsap.to('#lock-in-btn', { scale: 1, duration: 0.25, ease: 'back.out(1.6)' });
+}
+
+function lockIn() {
+  if (state.selectedIndex === null || state.isRevealing) return;
+  state.isRevealing = true;
+  setActionHint('Revealing...', false);
+
+  gsap.to('#lock-in-btn', { scale: 0, duration: 0.15 });
+  revealAnswer();
+}
+
+function setActionHint(text, ready) {
+  const hint = document.getElementById('action-hint');
+  hint.textContent = text;
+  hint.classList.toggle('ready', Boolean(ready));
+  gsap.fromTo(hint,
+    { scale: 0.98, opacity: 0.75 },
+    { scale: 1, opacity: 1, duration: 0.18, ease: 'power2.out' }
+  );
+}
+
+// ══════════════════════════════════════════════════════
+// CARD FLIP REVEAL
+// ══════════════════════════════════════════════════════
+function revealAnswer() {
+  const q = state.questions[state.currentIndex];
+  const isCorrect = state.selectedIndex === q.correctIndex;
+  const correctOption = q.options[q.correctIndex];
+
+  // Set up flip card content BEFORE flip
+  document.getElementById('flip-icon').textContent = isCorrect ? '✓' : '✗';
+  document.getElementById('flip-reveal-text').textContent = isCorrect ? 'Correct! They chose:' : 'They actually chose:';
+  document.getElementById('flip-answer-text').textContent = correctOption;
+
+  const flipFront = document.getElementById('flip-front');
+  flipFront.style.background = isCorrect ? '#F0FFF4' : '#FFF5F5';
+  flipFront.style.borderColor = isCorrect ? '#3CAE52' : '#E84040';
+  document.getElementById('flip-icon').style.color = isCorrect ? '#3CAE52' : '#E84040';
+
+  // Show overlay
+  const overlay = document.getElementById('flip-overlay');
+  overlay.classList.add('active');
+
+  // Reset flip inner to back-facing
+  const flipInner = document.getElementById('flip-inner');
+  flipInner.style.transform = 'rotateY(180deg)';
+
+  // "Hold your breath" delay (200ms), then flip
+  setTimeout(() => {
+    // Phase 1: rotate to 90° (suspense frame)
+    gsap.to(flipInner, {
+      rotationY: 90,
+      duration: 0.2,
+      ease: 'power2.in',
+      onComplete: () => {
+        // Brief hold at 90° — suspense frame
+        setTimeout(() => {
+          // Phase 2: rotate from 90° to 0° (reveal)
+          gsap.to(flipInner, {
+            rotationY: 0,
+            duration: 0.2,
+            ease: 'power2.out',
+            onComplete: () => {
+              // Post-reveal reactions
+              setTimeout(() => {
+                showFeedbackReaction(isCorrect, q);
+              }, 100);
+            }
+          });
+        }, 80); // Brief suspense hold
+      }
+    });
+  }, 200);
+}
+
+// ══════════════════════════════════════════════════════
+// FEEDBACK REACTIONS
+// ══════════════════════════════════════════════════════
+function showFeedbackReaction(isCorrect, q) {
+  if (isCorrect) {
+    // Update score
+    state.score += state.streak >= 2 ? 150 : 100;
+    state.streak++;
+    state.correctCount++;
+    if (state.streak > state.maxStreak) state.maxStreak = state.streak;
+
+    updateScoreDisplay(true);
+    updateStreakDisplay();
+
+    // Green flash on flip card
+    const flipFront = document.getElementById('flip-front');
+    gsap.to(flipFront, {
+      boxShadow: '0 0 0 6px rgba(60,174,82,0.4)',
+      duration: 0.3, yoyo: true, repeat: 1
+    });
+
+    // Avatar bounce
+    gsap.to('#person-display', {
+      scale: 1.15,
+      rotation: 5,
+      duration: 0.2,
+      yoyo: true,
+      repeat: 1,
+      ease: 'power2.out'
+    });
+
+    // Phrase
+    showPhrase(true);
+
+    // Particles
+    spawnCorrectParticles();
+
+    // Streak check
+    if (state.streak >= 3) {
+      setTimeout(() => showStreakBanner(), 400);
+    }
+
+  } else {
+    // Wrong answer
+    state.streak = 0;
+    updateStreakDisplay();
+
+    // Shake the flip card
+    gsap.to('#flip-inner', {
+      x: 8, duration: 0.05,
+      repeat: 5, yoyo: true,
+      ease: 'none',
+      onComplete: () => gsap.set('#flip-inner', { x: 0 })
+    });
+
+    // Avatar shrug
+    gsap.to('#person-display', {
+      rotation: 8, duration: 0.15,
+      yoyo: true, repeat: 3,
+      ease: 'power2.inOut'
+    });
+
+    // Screen subtle shake
+    const container = document.getElementById('game-container');
+    gsap.to(container, {
+      x: 4, duration: 0.06,
+      repeat: 3, yoyo: true,
+      ease: 'none',
+      onComplete: () => gsap.set(container, { x: 0 })
+    });
+
+    // Phrase
+    showPhrase(false);
+  }
+
+  // Show "next" button after 1.5s
+  setTimeout(() => {
+    // Hide flip overlay
+    const overlay = document.getElementById('flip-overlay');
+    gsap.to(overlay, {
+      opacity: 0, duration: 0.3,
+      onComplete: () => {
+        overlay.classList.remove('active');
+        overlay.style.opacity = '';
+      }
+    });
+
+    // Show next button
+    gsap.to('#next-btn', { scale: 1, duration: 0.25, ease: 'back.out(1.6)', delay: 0.1 });
+  }, 1500);
+}
+
+function showPhrase(isCorrect) {
+  const phrases = isCorrect ? CORRECT_PHRASES : INCORRECT_PHRASES;
+  let idx;
+  const lastIdx = isCorrect ? state.lastCorrectPhraseIdx : state.lastIncorrectPhraseIdx;
+
+  do {
+    idx = Math.floor(Math.random() * phrases.length);
+  } while (idx === lastIdx && phrases.length > 1);
+
+  if (isCorrect) state.lastCorrectPhraseIdx = idx;
+  else state.lastIncorrectPhraseIdx = idx;
+
+  const el = document.getElementById('feedback-phrase');
+  el.textContent = phrases[idx];
+  el.style.color = isCorrect ? '#3CAE52' : '#E84040';
+
+  gsap.fromTo(el,
+    { scale: 0, opacity: 0, y: 20 },
+    {
+      scale: 1, opacity: 1, y: 0,
+      duration: 0.4, ease: 'back.out(1.6)',
+      onComplete: () => {
+        setTimeout(() => {
+          gsap.to(el, { opacity: 0, y: -20, duration: 0.3 });
+        }, 1000);
+      }
+    }
+  );
+}
+
+function showStreakBanner() {
+  const phrases = STREAK_PHRASES;
+  const phrase = phrases[Math.floor(Math.random() * phrases.length)];
+
+  const el = document.getElementById('streak-display');
+  gsap.to(el, { scale: 1.4, color: '#FF6820', duration: 0.2, yoyo: true, repeat: 1 });
+
+  const streakEl = document.getElementById('feedback-phrase');
+  streakEl.textContent = phrase;
+  streakEl.style.color = '#FF6820';
+
+  gsap.fromTo(streakEl,
+    { scale: 0, opacity: 0, x: 60 },
+    {
+      scale: 1, opacity: 1, x: 0,
+      duration: 0.4, ease: 'back.out(1.6)',
+      onComplete: () => {
+        setTimeout(() => {
+          gsap.to(streakEl, { opacity: 0, x: -60, duration: 0.3 });
+        }, 1200);
+      }
+    }
+  );
+
+  // Screen shake
+  gsap.to('#game-container', {
+    x: 1, duration: 0.08, repeat: 2, yoyo: true,
+    ease: 'none',
+    onComplete: () => gsap.set('#game-container', { x: 0 })
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// SCORE UPDATE WITH ROLL
+// ══════════════════════════════════════════════════════
+function updateScoreDisplay(animate) {
+  const el = document.getElementById('score-display');
+  if (animate) {
+    const start = state.score - (state.streak >= 2 ? 150 : 100);
+    const end = state.score;
+    const obj = { val: start };
+    gsap.to(obj, {
+      val: end, duration: 0.5, ease: 'power2.out',
+      onUpdate: () => {
+        el.textContent = `Score: ${Math.round(obj.val)}`;
+      }
+    });
+    gsap.fromTo(el, { scale: 1 }, { scale: 1.2, duration: 0.15, yoyo: true, repeat: 1 });
+  } else {
+    el.textContent = `Score: ${state.score}`;
+  }
+}
+
+function updateStreakDisplay() {
+  const el = document.getElementById('streak-display');
+  document.getElementById('streak-count').textContent = state.streak;
+  if (state.streak >= 2) {
+    el.classList.add('active');
+  } else {
+    el.classList.remove('active');
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// PARTICLES
+// ══════════════════════════════════════════════════════
+function spawnCorrectParticles() {
+  const container = document.getElementById('game-container');
+  const colors = ['#3CAE52', '#60D878', '#FFD060', '#F0A030', '#4080E8'];
+  const count = 10;
+
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = 6 + Math.random() * 8;
+    p.style.cssText = `
+      width: ${size}px;
+      height: ${size}px;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      left: 50%;
+      top: 50%;
+      position: absolute;
+    `;
+    container.appendChild(p);
+
+    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+    const dist = 80 + Math.random() * 100;
+    gsap.fromTo(p,
+      { x: 0, y: 0, opacity: 1, scale: 1 },
+      {
+        x: Math.cos(angle) * dist,
+        y: Math.sin(angle) * dist,
+        opacity: 0,
+        scale: 0,
+        duration: 0.7 + Math.random() * 0.3,
+        ease: 'power2.out',
+        delay: Math.random() * 0.1,
+        onComplete: () => p.remove()
+      }
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════
+function nextQuestion() {
+  state.currentIndex++;
+  state.isRevealing = false;
+  state.selectedIndex = null;
+
+  if (state.currentIndex >= 10) {
+    showResults();
+    return;
+  }
+
+  // Exit current question card
+  gsap.to('#question-card', {
+    y: -60, opacity: 0, duration: 0.2, ease: 'power2.in',
+    onComplete: renderQuestion
+  });
+}
+
+function showResults() {
+  // Use the directly tracked correctCount — accurate for all players including streak scorers
+  const approxCorrect = state.correctCount;
+
+  const resultsScreen = document.getElementById('results-screen');
+  resultsScreen.classList.add('active');
+
+  const pct = (approxCorrect / 10) * 100;
+  let tier, emoji;
+  if (pct <= 40) {
+    tier = "Are you sure you know this person? 👀";
+    emoji = "🤔";
+  } else if (pct <= 70) {
+    tier = "Pretty solid — you pay attention!";
+    emoji = "😊";
+  } else {
+    tier = "You might know them better than they know themselves 🔮";
+    emoji = "🌟";
+  }
+
+  document.getElementById('results-emoji').textContent = emoji;
+  document.getElementById('results-score').textContent = `${approxCorrect}/10`;
+  document.getElementById('results-correct').textContent = approxCorrect;
+  document.getElementById('results-tier').textContent = tier;
+
+  gsap.fromTo(resultsScreen,
+    { opacity: 0, scale: 0.95 },
+    { opacity: 1, scale: 1, duration: 0.4, ease: 'back.out(1.2)' }
+  );
+
+  // Confetti
+  spawnResultsConfetti();
+}
+
+function spawnResultsConfetti() {
+  const container = document.getElementById('game-container');
+  const colors = ['#F0A030', '#3CAE52', '#4080E8', '#E84040', '#FFD060', '#9040D8'];
+  for (let i = 0; i < 40; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    p.style.cssText = `
+      background: ${color};
+      left: ${Math.random() * 100}%;
+      top: -10px;
+      position: absolute;
+      transform: rotate(${Math.random() * 360}deg);
+      border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
+    `;
+    container.appendChild(p);
+
+    gsap.to(p, {
+      y: 900,
+      x: (Math.random() - 0.5) * 200,
+      rotation: Math.random() * 720 - 360,
+      opacity: 0,
+      duration: 1.5 + Math.random() * 1,
+      delay: Math.random() * 0.5,
+      ease: 'power1.in',
+      onComplete: () => p.remove()
+    });
+  }
+}
+
+function resetGame() {
+  state = {
+    questions: [],
+    currentIndex: 0,
+    score: 0,
+    streak: 0,
+    maxStreak: 0,
+    correctCount: 0,
+    selectedIndex: null,
+    isRevealing: false,
+    isFirstQuestion: true,
+    lastCorrectPhraseIdx: -1,
+    lastIncorrectPhraseIdx: -1
+  };
+  initGame();
+}
+
+// ══════════════════════════════════════════════════════
+// ALSO support tapping selected card again as lock-in
+// ══════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  initGame();
+});
+</script>
+
+</body>
+</html>

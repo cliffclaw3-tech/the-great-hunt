@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Royal Gems — Puzzle</title>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.88.2/dist/phaser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #2A1A0A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  #game-wrapper {
+    position: relative;
+    width: 390px;
+    height: 844px;
+  }
+
+  #phaser-canvas {
+    display: block;
+  }
+
+  /* ── CHROME OVERLAYS (DOM) ── */
+  #chrome-top {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 150px;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  #level-label {
+    position: absolute;
+    top: 12px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 13px;
+    color: #D4A820;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  #goal-display {
+    position: absolute;
+    top: 34px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20,10,2,0.75);
+    border: 2px solid #D4A820;
+    border-radius: 32px;
+    padding: 8px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  #goal-icon {
+    font-size: 22px;
+  }
+
+  #goal-text {
+    font-size: 16px;
+    color: #FAF0D8;
+    font-weight: 700;
+  }
+
+  #goal-count {
+    font-size: 20px;
+    color: #FFD060;
+    font-weight: 900;
+  }
+
+  #moves-display {
+    position: absolute;
+    top: 34px; right: 16px;
+    background: rgba(20,10,2,0.75);
+    border: 2px solid #D4A820;
+    border-radius: 16px;
+    padding: 6px 14px;
+    text-align: center;
+  }
+
+  #moves-label {
+    font-size: 10px;
+    color: #D4A820;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  #moves-count {
+    font-size: 22px;
+    color: #FAF0D8;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  #moves-count.warning { color: #E84040; }
+
+  /* ── WIN / LOSS OVERLAYS ── */
+  #win-overlay, #loss-overlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 50;
+    text-align: center;
+    padding: 32px;
+  }
+
+  #win-overlay.active, #loss-overlay.active { display: flex; }
+
+  .overlay-title {
+    font-size: 36px;
+    font-weight: 900;
+    color: #FFD060;
+    text-shadow: 0 0 20px rgba(255,208,96,0.6);
+    margin-bottom: 8px;
+  }
+
+  .overlay-subtitle {
+    font-size: 16px;
+    color: #FAF0D8;
+    margin-bottom: 20px;
+    opacity: 0.85;
+  }
+
+  .stars-container {
+    display: flex;
+    gap: 8px;
+    margin: 16px 0 24px;
+  }
+
+  .star {
+    font-size: 40px;
+    opacity: 0;
+    transform: scale(0);
+    display: inline-block;
+  }
+
+  .overlay-btn {
+    background: linear-gradient(135deg, #D4A820, #FFD060);
+    color: #1A1A0A;
+    font-size: 18px;
+    font-weight: 800;
+    border: none;
+    border-radius: 32px;
+    padding: 14px 44px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(212,168,32,0.5);
+    letter-spacing: 0.5px;
+    pointer-events: all;
+  }
+
+  .proximity-msg {
+    font-size: 15px;
+    color: #E88080;
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+
+  /* ── TUTORIAL POINTER ── */
+  #tutorial-pointer {
+    position: absolute;
+    font-size: 32px;
+    pointer-events: none;
+    z-index: 20;
+    opacity: 0;
+    transform-origin: center bottom;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+  }
+
+  #tutorial-toast {
+    position: absolute;
+    left: 50%;
+    top: 104px;
+    transform: translateX(-50%);
+    z-index: 22;
+    opacity: 0;
+    pointer-events: none;
+    width: 310px;
+    padding: 10px 14px;
+    border-radius: 18px;
+    background: rgba(20, 10, 2, 0.86);
+    border: 2px solid rgba(255, 208, 96, 0.8);
+    color: #FAF0D8;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.25;
+    text-align: center;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  }
+
+  /* ── TUTORIAL CLUSTER GLOW ── */
+  .tutorial-cluster-glow {
+    position: absolute;
+    pointer-events: none;
+    z-index: 15;
+    border-radius: 12px;
+    box-shadow: 0 0 12px 4px rgba(255, 208, 96, 0.7);
+    background: rgba(255, 208, 96, 0.18);
+    border: 2px solid rgba(255, 208, 96, 0.6);
+  }
+
+  /* ── CONFETTI ── */
+  .confetti-piece {
+    position: absolute;
+    pointer-events: none;
+    z-index: 45;
+    border-radius: 2px;
+  }
+
+  /* ── SCORE POPUP ── */
+  .score-popup {
+    position: absolute;
+    pointer-events: none;
+    z-index: 25;
+    font-size: 18px;
+    font-weight: 900;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  }
+
+  /* ── COMBO TEXT ── */
+  #combo-text {
+    position: absolute;
+    top: 45%;
+    left: 50%;
+    transform: translateX(-50%) scale(0);
+    font-size: 26px;
+    font-weight: 900;
+    color: #FFD060;
+    text-shadow: 0 0 16px rgba(255,208,96,0.8), 0 2px 4px rgba(0,0,0,0.5);
+    pointer-events: none;
+    z-index: 30;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<div id="game-wrapper">
+  <!-- Phaser canvas goes here -->
+
+  <!-- DOM Chrome -->
+  <div id="chrome-top">
+    <div id="level-label">Level 1</div>
+    <div id="goal-display">
+      <span id="goal-icon">💎</span>
+      <span id="goal-text">Collect</span>
+      <span id="goal-count">30</span>
+    </div>
+    <div id="moves-display">
+      <div id="moves-label">Moves</div>
+      <div id="moves-count">25</div>
+    </div>
+  </div>
+
+  <!-- Tutorial pointer -->
+  <div id="tutorial-pointer">👆</div>
+  <div id="tutorial-toast">Tap matching gems. The whole glowing cluster clears.</div>
+
+  <!-- Combo text -->
+  <div id="combo-text">Combo! ⚡</div>
+
+  <!-- Win overlay -->
+  <div id="win-overlay">
+    <div class="overlay-title">✨ Level Complete!</div>
+    <div class="overlay-subtitle">You collected all the gems!</div>
+    <div class="stars-container">
+      <span class="star" id="star1">⭐</span>
+      <span class="star" id="star2">⭐</span>
+      <span class="star" id="star3">⭐</span>
+    </div>
+    <button class="overlay-btn" onclick="restartGame()">Next Level →</button>
+  </div>
+
+  <!-- Loss overlay -->
+  <div id="loss-overlay">
+    <div class="overlay-title" style="color:#E88080;">Out of Moves!</div>
+    <div class="overlay-subtitle">So close — you almost had it!</div>
+    <div class="proximity-msg" id="proximity-msg">You needed 8 more 💎</div>
+    <button class="overlay-btn" onclick="restartGame()">Try Again →</button>
+    <button class="overlay-btn" style="margin-top:8px;background:rgba(255,255,255,0.1);color:#FAF0D8;box-shadow:none;border:2px solid rgba(255,255,255,0.2);" onclick="restartGame()">+5 Moves (stub)</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════════════
+const COLS = 7;
+const ROWS = 9;
+const TILE_SIZE = 52;
+const TILE_GAP = 3;
+const BOARD_X = 195; // Center of 390px
+const BOARD_TOP = 160; // Below chrome
+const BOARD_W = COLS * (TILE_SIZE + TILE_GAP) - TILE_GAP;
+const BOARD_H = ROWS * (TILE_SIZE + TILE_GAP) - TILE_GAP;
+
+// Tile types with colors and emojis
+const TILE_TYPES = [
+  { id: 0, name: 'ruby',    color: 0xE84040, light: 0xFF8080, dark: 0xA02020, emoji: '💎', cssColor: '#E84040' },
+  { id: 1, name: 'sapphire', color: 0x4080E8, light: 0x80B0FF, dark: 0x2050A0, emoji: '🔷', cssColor: '#4080E8' },
+  { id: 2, name: 'emerald',  color: 0x3CAE52, light: 0x70D888, dark: 0x207A38, emoji: '💚', cssColor: '#3CAE52' },
+  { id: 3, name: 'amethyst', color: 0x9040D8, light: 0xC080FF, dark: 0x602090, emoji: '💜', cssColor: '#9040D8' },
+  { id: 4, name: 'topaz',    color: 0xE88020, light: 0xFFB060, dark: 0xA05010, emoji: '🟠', cssColor: '#E88020' },
+];
+
+const NUM_TYPES = TILE_TYPES.length;
+const GOAL_TYPE = 0; // ruby is the goal tile
+const GOAL_COUNT = 30;
+const MAX_MOVES = 25;
+
+let gameScene = null;
+let gameState = {
+  board: [],
+  moves: MAX_MOVES,
+  collected: 0,
+  goalType: GOAL_TYPE,
+  selectedTile: null,
+  isAnimating: false,
+  tutorialShown: false,
+  gameOver: false
+};
+
+// ══════════════════════════════════════════════════════
+// PHASER SCENE
+// ══════════════════════════════════════════════════════
+class GameScene extends Phaser.Scene {
+  constructor() {
+    super({ key: 'GameScene' });
+    this.tileSprites = [];
+    this.particles = null;
+    this.selectionGlow = null;
+  }
+
+  preload() {
+    // No external assets — we draw everything programmatically
+  }
+
+  create() {
+    gameScene = this;
+
+    // Board background
+    const bgGfx = this.add.graphics();
+    bgGfx.fillStyle(0x3A2510, 1);
+    bgGfx.fillRoundedRect(
+      BOARD_X - BOARD_W / 2 - 8, BOARD_TOP - 8,
+      BOARD_W + 16, BOARD_H + 16,
+      12
+    );
+    bgGfx.lineStyle(2, 0xD4A820, 0.6);
+    bgGfx.strokeRoundedRect(
+      BOARD_X - BOARD_W / 2 - 8, BOARD_TOP - 8,
+      BOARD_W + 16, BOARD_H + 16,
+      12
+    );
+
+    // Selection glow
+    this.selectionGlow = this.add.graphics();
+    this.selectionGlow.setDepth(5);
+
+    // Init board
+    this.initBoard();
+
+    // Input
+    this.input.on('pointerdown', this.onPointerDown, this);
+
+    // Tutorial trigger
+    setTimeout(() => this.showTutorial(), 600);
+  }
+
+  initBoard() {
+    // Clear old sprites
+    this.tileSprites.forEach(row => row.forEach(s => { if (s) s.destroy(); }));
+    this.tileSprites = [];
+
+    gameState.board = [];
+    for (let row = 0; row < ROWS; row++) {
+      gameState.board[row] = [];
+      this.tileSprites[row] = [];
+      for (let col = 0; col < COLS; col++) {
+        const type = Math.floor(Math.random() * NUM_TYPES);
+        gameState.board[row][col] = { type, row, col };
+        const sprite = this.createTileSprite(row, col, type);
+        this.tileSprites[row][col] = sprite;
+      }
+    }
+  }
+
+  createTileSprite(row, col, type) {
+    const t = TILE_TYPES[type];
+    const { x, y } = this.getTileXY(row, col);
+
+    const container = this.add.container(x, y);
+    container.setDepth(3);
+
+    // Tile background (rounded rect via graphics)
+    const gfx = this.add.graphics();
+    gfx.fillStyle(t.dark, 1);
+    gfx.fillRoundedRect(-TILE_SIZE/2, -TILE_SIZE/2, TILE_SIZE, TILE_SIZE, 10);
+
+    // Main fill
+    gfx.fillStyle(t.color, 1);
+    gfx.fillRoundedRect(-TILE_SIZE/2 + 2, -TILE_SIZE/2 + 2, TILE_SIZE - 4, TILE_SIZE - 4, 8);
+
+    // Highlight (bevel)
+    gfx.fillStyle(t.light, 0.5);
+    gfx.fillRoundedRect(-TILE_SIZE/2 + 4, -TILE_SIZE/2 + 4, TILE_SIZE - 16, TILE_SIZE / 2 - 4, 5);
+
+    container.add(gfx);
+
+    // Emoji label
+    const label = this.add.text(0, 2, t.emoji, {
+      fontSize: '20px',
+      align: 'center'
+    }).setOrigin(0.5);
+    container.add(label);
+
+    return container;
+  }
+
+  getTileXY(row, col) {
+    const startX = BOARD_X - BOARD_W / 2;
+    const x = startX + col * (TILE_SIZE + TILE_GAP) + TILE_SIZE / 2;
+    const y = BOARD_TOP + row * (TILE_SIZE + TILE_GAP) + TILE_SIZE / 2;
+    return { x, y };
+  }
+
+  onPointerDown(pointer) {
+    if (gameState.isAnimating || gameState.gameOver) return;
+
+    const col = Math.floor((pointer.x - (BOARD_X - BOARD_W / 2)) / (TILE_SIZE + TILE_GAP));
+    const row = Math.floor((pointer.y - BOARD_TOP) / (TILE_SIZE + TILE_GAP));
+
+    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) {
+      // Tapped outside board
+      this.clearSelection();
+      return;
+    }
+
+    const tile = gameState.board[row][col];
+    if (!tile) return;
+
+    if (gameState.selectedTile === null) {
+      // First tap — select
+      gameState.selectedTile = { row, col };
+      this.drawSelectionGlow(row, col, TILE_TYPES[tile.type].color);
+      this.shakeTile(row, col, false);
+    } else {
+      const sel = gameState.selectedTile;
+      if (sel.row === row && sel.col === col) {
+        // Tapped same tile — deselect
+        this.clearSelection();
+        return;
+      }
+
+      // Check adjacency and same type
+      const isAdjacentRow = Math.abs(sel.row - row) + Math.abs(sel.col - col) === 1;
+      const selType = gameState.board[sel.row][sel.col]?.type;
+      const tarType = gameState.board[row][col]?.type;
+
+      if (isAdjacentRow && selType === tarType) {
+        // Valid match!
+        this.clearSelection();
+        this.tryMatch(sel.row, sel.col, row, col);
+      } else {
+        // Invalid — shake both
+        this.shakeTile(sel.row, sel.col, true);
+        this.clearSelection();
+
+        // Select new tile
+        gameState.selectedTile = { row, col };
+        this.drawSelectionGlow(row, col, TILE_TYPES[tarType].color);
+        this.shakeTile(row, col, false);
+      }
+    }
+  }
+
+  drawSelectionGlow(row, col, color) {
+    const { x, y } = this.getTileXY(row, col);
+    const gfx = this.selectionGlow;
+    gfx.clear();
+    gfx.lineStyle(3, color, 0.9);
+    gfx.strokeRoundedRect(x - TILE_SIZE / 2 - 3, y - TILE_SIZE / 2 - 3, TILE_SIZE + 6, TILE_SIZE + 6, 12);
+    gfx.lineStyle(1, 0xFFFFFF, 0.4);
+    gfx.strokeRoundedRect(x - TILE_SIZE / 2 - 5, y - TILE_SIZE / 2 - 5, TILE_SIZE + 10, TILE_SIZE + 10, 14);
+  }
+
+  clearSelection() {
+    gameState.selectedTile = null;
+    this.selectionGlow.clear();
+  }
+
+  shakeTile(row, col, isWrong) {
+    const sprite = this.tileSprites[row]?.[col];
+    if (!sprite) return;
+    const { x } = this.getTileXY(row, col);
+    if (isWrong) {
+      this.tweens.add({
+        targets: sprite,
+        x: x + 6, duration: 40,
+        yoyo: true, repeat: 3,
+        ease: 'Linear',
+        onComplete: () => sprite.x = x
+      });
+    }
+  }
+
+  tryMatch(r1, c1, r2, c2) {
+    gameState.isAnimating = true;
+    gameState.moves--;
+    this.updateMoves();
+
+    // Find all connected same-type tiles (flood fill from both positions)
+    const type = gameState.board[r1][c1].type;
+    const matched = this.findConnectedSameType(r1, c1, type);
+
+    if (matched.length < 2) {
+      // Should not happen given our check, but safety
+      gameState.isAnimating = false;
+      return;
+    }
+
+    // Check for combo (4+ tiles total matched)
+    const isCombo = matched.length >= 4;
+    const isPowerMove = matched.length >= 5;
+
+    // Animate matched tiles out
+    this.animateTilesClear(matched, type, isCombo, isPowerMove, () => {
+      // Clear from board
+      matched.forEach(({ row, col }) => {
+        if (this.tileSprites[row]?.[col]) {
+          this.tileSprites[row][col].destroy();
+          this.tileSprites[row][col] = null;
+        }
+        gameState.board[row][col] = null;
+      });
+
+      // Count goal tiles cleared
+      const goalCleared = matched.filter(t => t.type === GOAL_TYPE).length;
+      if (goalCleared > 0) {
+        gameState.collected += goalCleared;
+        this.updateGoalDisplay(true);
+      }
+
+      // Cascade
+      this.cascadeBoard(() => {
+        gameState.isAnimating = false;
+
+        // Check win/loss
+        if (gameState.collected >= GOAL_COUNT) {
+          setTimeout(() => this.triggerWin(), 300);
+        } else if (gameState.moves <= 0) {
+          setTimeout(() => this.triggerLoss(), 400);
+        } else {
+          // Show tutorial on first valid match
+          if (!gameState.tutorialShown) {
+            gameState.tutorialShown = true;
+            document.getElementById('tutorial-pointer').style.opacity = '0';
+            gsap.to('#tutorial-toast', { opacity: 0, y: -8, duration: 0.25 });
+          }
+        }
+      });
+    });
+  }
+
+  findConnectedSameType(startRow, startCol, type) {
+    // Simple: find all adjacent same-type tiles via BFS
+    const visited = new Set();
+    const queue = [{ row: startRow, col: startCol }];
+    const result = [];
+    const key = (r, c) => `${r},${c}`;
+
+    while (queue.length > 0) {
+      const { row, col } = queue.shift();
+      const k = key(row, col);
+      if (visited.has(k)) continue;
+      if (row < 0 || row >= ROWS || col < 0 || col >= COLS) continue;
+      if (!gameState.board[row]?.[col] || gameState.board[row][col].type !== type) continue;
+
+      visited.add(k);
+      result.push({ row, col, type });
+
+      queue.push({ row: row - 1, col });
+      queue.push({ row: row + 1, col });
+      queue.push({ row, col: col - 1 });
+      queue.push({ row, col: col + 1 });
+    }
+
+    return result;
+  }
+
+  animateTilesClear(tiles, type, isCombo, isPowerMove, onComplete) {
+    const tileType = TILE_TYPES[type];
+    let completed = 0;
+
+    tiles.forEach(({ row, col }, i) => {
+      const sprite = this.tileSprites[row]?.[col];
+      if (!sprite) { completed++; if (completed === tiles.length) onComplete(); return; }
+
+      const { x, y } = this.getTileXY(row, col);
+
+      // Pop + scale out
+      this.tweens.add({
+        targets: sprite,
+        scaleX: 1.15, scaleY: 1.15,
+        duration: 80,
+        ease: 'Power2',
+        onComplete: () => {
+          this.tweens.add({
+            targets: sprite,
+            scaleX: 0, scaleY: 0,
+            duration: 150,
+            ease: 'Power2.in',
+            onComplete: () => {
+              // Particles
+              this.spawnMatchParticles(x, y, tileType.color, isPowerMove ? 16 : 7);
+              // Score popup
+              this.showScorePopup(x, y, tileType.cssColor, isPowerMove ? 150 : 50);
+
+              completed++;
+              if (completed === tiles.length) {
+                // Combo / power feedback
+                if (isPowerMove) {
+                  this.doPowerMoveEffect();
+                } else if (isCombo) {
+                  this.doComboEffect();
+                }
+                setTimeout(onComplete, isCombo ? 400 : 0);
+              }
+            }
+          });
+        }
+      });
+    });
+  }
+
+  spawnMatchParticles(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count;
+      const dist = 30 + Math.random() * 50;
+      const gfx = this.add.graphics();
+      const size = 4 + Math.random() * 5;
+      gfx.fillStyle(color, 1);
+      gfx.fillCircle(0, 0, size);
+      gfx.setPosition(x, y);
+      gfx.setDepth(10);
+
+      this.tweens.add({
+        targets: gfx,
+        x: x + Math.cos(angle) * dist,
+        y: y + Math.sin(angle) * dist,
+        alpha: 0,
+        scaleX: 0.2, scaleY: 0.2,
+        duration: 350 + Math.random() * 200,
+        ease: 'Power2.out',
+        onComplete: () => gfx.destroy()
+      });
+    }
+  }
+
+  showScorePopup(x, y, color, points) {
+    const wrapper = document.getElementById('game-wrapper');
+    const popup = document.createElement('div');
+    popup.className = 'score-popup';
+    popup.style.cssText = `left:${x}px;top:${y}px;color:${color};transform:translate(-50%,-50%);`;
+    popup.textContent = `+${points}`;
+    wrapper.appendChild(popup);
+
+    gsap.fromTo(popup,
+      { y: 0, opacity: 1, scale: 1 },
+      {
+        y: -35, opacity: 0, scale: 1.3,
+        duration: 0.55, ease: 'power2.out',
+        onComplete: () => popup.remove()
+      }
+    );
+  }
+
+  doComboEffect() {
+    const combo = document.getElementById('combo-text');
+    combo.textContent = 'Combo! ⚡';
+    gsap.fromTo(combo,
+      { scale: 0, opacity: 0 },
+      {
+        scale: 1, opacity: 1, duration: 0.3, ease: 'back.out(2)',
+        onComplete: () => {
+          setTimeout(() => gsap.to(combo, { scale: 0, opacity: 0, duration: 0.2 }), 600);
+        }
+      }
+    );
+
+    // Screen vignette flash
+    this.doVignetteFlash('#D4A820', 0.25);
+  }
+
+  doPowerMoveEffect() {
+    const combo = document.getElementById('combo-text');
+    combo.textContent = '⚡ POWER MATCH! ⚡';
+    combo.style.color = '#FF8020';
+
+    gsap.fromTo(combo,
+      { scale: 0, opacity: 0 },
+      {
+        scale: 1.2, opacity: 1, duration: 0.35, ease: 'back.out(2)',
+        onComplete: () => {
+          gsap.to(combo, { scale: 1, duration: 0.1 });
+          setTimeout(() => {
+            gsap.to(combo, { scale: 0, opacity: 0, duration: 0.3 });
+            combo.style.color = '#FFD060';
+          }, 900);
+        }
+      }
+    );
+
+    // Full board shake
+    const canvas = this.sys.canvas;
+    gsap.to(canvas, {
+      x: 3, duration: 0.05, repeat: 5, yoyo: true,
+      ease: 'none',
+      onComplete: () => gsap.set(canvas, { x: 0 })
+    });
+
+    // White flash
+    this.doVignetteFlash('#FFFFFF', 0.3, 80);
+  }
+
+  doVignetteFlash(color, maxOpacity, duration) {
+    const wrapper = document.getElementById('game-wrapper');
+    const flash = document.createElement('div');
+    flash.style.cssText = `
+      position:absolute;inset:0;pointer-events:none;z-index:40;
+      background:${color};opacity:0;
+    `;
+    wrapper.appendChild(flash);
+    gsap.fromTo(flash,
+      { opacity: 0 },
+      {
+        opacity: maxOpacity, duration: (duration || 150) / 1000,
+        yoyo: true, repeat: 1,
+        onComplete: () => flash.remove()
+      }
+    );
+  }
+
+  cascadeBoard(onComplete) {
+    let maxAnimTime = 0;
+
+    for (let col = 0; col < COLS; col++) {
+      // Collect tiles in column from bottom up
+      let emptyRows = [];
+      for (let row = ROWS - 1; row >= 0; row--) {
+        if (!gameState.board[row][col]) {
+          emptyRows.push(row);
+        } else if (emptyRows.length > 0) {
+          // Move tile down
+          const targetRow = emptyRows.shift();
+          const tile = gameState.board[row][col];
+          const sprite = this.tileSprites[row][col];
+
+          // Update state
+          gameState.board[targetRow][col] = { ...tile, row: targetRow, col };
+          gameState.board[row][col] = null;
+          this.tileSprites[targetRow][col] = sprite;
+          this.tileSprites[row][col] = null;
+
+          const { y: targetY } = this.getTileXY(targetRow, col);
+          const fallDelay = (ROWS - 1 - targetRow) * 0.02;
+          const fallDuration = Math.max(0.1, 0.25 + (targetRow - row) * 0.05);
+
+          this.tweens.add({
+            targets: sprite,
+            y: targetY,
+            duration: fallDuration * 1000,
+            ease: 'Bounce.out',
+            delay: fallDelay * 1000
+          });
+
+          const animEnd = (fallDelay + fallDuration) * 1000;
+          if (animEnd > maxAnimTime) maxAnimTime = animEnd;
+
+          emptyRows.push(row);
+        }
+      }
+
+      // Spawn new tiles at top for empty rows
+      emptyRows.forEach((row, i) => {
+        const type = Math.floor(Math.random() * NUM_TYPES);
+        gameState.board[row][col] = { type, row, col };
+
+        const { x, y: targetY } = this.getTileXY(row, col);
+        const startY = BOARD_TOP - (i + 1) * (TILE_SIZE + TILE_GAP);
+
+        const sprite = this.createTileSprite(row, col, type);
+        sprite.y = startY;
+        sprite.x = x;
+        this.tileSprites[row][col] = sprite;
+
+        const dropDelay = 0.05 + i * 0.04;
+        this.tweens.add({
+          targets: sprite,
+          y: targetY,
+          duration: 300,
+          ease: 'Bounce.out',
+          delay: dropDelay * 1000
+        });
+
+        const animEnd = (dropDelay + 0.3) * 1000;
+        if (animEnd > maxAnimTime) maxAnimTime = animEnd;
+      });
+    }
+
+    // Wait for all animations, then callback
+    setTimeout(onComplete, maxAnimTime + 50);
+  }
+
+  // ── UI UPDATE ──
+  updateMoves() {
+    const el = document.getElementById('moves-count');
+    el.textContent = gameState.moves;
+    if (gameState.moves <= 5) {
+      el.classList.add('warning');
+    }
+    gsap.fromTo(el, { scale: 1.25 }, { scale: 1, duration: 0.2, ease: 'power2.out' });
+  }
+
+  updateGoalDisplay(pulse) {
+    const remaining = Math.max(0, GOAL_COUNT - gameState.collected);
+    const el = document.getElementById('goal-count');
+    el.textContent = remaining;
+
+    if (pulse) {
+      gsap.fromTo('#goal-display',
+        { scale: 1 },
+        { scale: 1.15, duration: 0.15, yoyo: true, repeat: 1, ease: 'power2.out' }
+      );
+    }
+
+    // "Almost there" pulse when close
+    if (remaining <= 3 && remaining > 0) {
+      gsap.killTweensOf('#goal-display');
+      gsap.to('#goal-display', {
+        scale: 1.05, duration: 0.5, yoyo: true, repeat: -1, ease: 'sine.inOut'
+      });
+    }
+  }
+
+  // ── TUTORIAL ──
+  showTutorial() {
+    if (gameState.tutorialShown) return;
+
+    // Find a valid matching pair
+    const pair = this.findValidPair();
+    if (!pair) return;
+
+    const { x, y } = this.getTileXY(pair.r1, pair.c1);
+    const pointer = document.getElementById('tutorial-pointer');
+    const toast = document.getElementById('tutorial-toast');
+
+    pointer.style.left = `${x - 16}px`;
+    pointer.style.top = `${y - 48}px`;
+
+    gsap.fromTo(toast,
+      { opacity: 0, y: -6 },
+      { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' }
+    );
+
+    // Find the entire connected cluster starting from the first tile of the pair
+    const clusterType = gameState.board[pair.r1][pair.c1].type;
+    const cluster = this.findConnectedSameType(pair.r1, pair.c1, clusterType);
+
+    // Highlight all tiles in the connected cluster so the player sees
+    // that ALL connected same-type tiles will clear together
+    const wrapper = document.getElementById('game-wrapper');
+    const clusterGlows = [];
+    cluster.forEach(({ row, col }) => {
+      const { x: tx, y: ty } = this.getTileXY(row, col);
+      const glow = document.createElement('div');
+      glow.className = 'tutorial-cluster-glow';
+      glow.style.cssText = [
+        `left:${tx - TILE_SIZE / 2 - 3}px`,
+        `top:${ty - TILE_SIZE / 2 - 3}px`,
+        `width:${TILE_SIZE + 6}px`,
+        `height:${TILE_SIZE + 6}px`,
+        'opacity:0'
+      ].join(';');
+      wrapper.appendChild(glow);
+      clusterGlows.push(glow);
+    });
+
+    // Animate cluster glows in with a staggered pulse, then fade out
+    clusterGlows.forEach((glow, i) => {
+      gsap.fromTo(glow,
+        { opacity: 0, scale: 0.85 },
+        {
+          opacity: 1, scale: 1, duration: 0.35, delay: i * 0.04,
+          ease: 'back.out(1.4)',
+          onComplete: () => {
+            gsap.to(glow, {
+              opacity: 0.5, duration: 0.45, yoyo: true, repeat: 5, ease: 'sine.inOut',
+              onComplete: () => {
+                gsap.to(glow, { opacity: 0, duration: 0.3, delay: 0.5,
+                  onComplete: () => glow.remove()
+                });
+              }
+            });
+          }
+        }
+      );
+    });
+
+    gsap.fromTo(pointer,
+      { opacity: 0, scale: 0.8 },
+      {
+        opacity: 1, scale: 1, duration: 0.4, ease: 'back.out(1.6)',
+        onComplete: () => {
+          // Pulse twice
+          gsap.to(pointer, {
+            scale: 1.15, duration: 0.4, yoyo: true, repeat: 3, ease: 'sine.inOut',
+            onComplete: () => {
+              gsap.to(pointer, { opacity: 0, duration: 0.3, delay: 1 });
+            }
+          });
+        }
+      }
+    );
+  }
+
+  findValidPair() {
+    // Find first pair of adjacent same-type tiles
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS - 1; col++) {
+        if (gameState.board[row][col] && gameState.board[row][col + 1]) {
+          if (gameState.board[row][col].type === gameState.board[row][col + 1].type) {
+            return { r1: row, c1: col, r2: row, c2: col + 1 };
+          }
+        }
+      }
+    }
+    for (let row = 0; row < ROWS - 1; row++) {
+      for (let col = 0; col < COLS; col++) {
+        if (gameState.board[row][col] && gameState.board[row + 1][col]) {
+          if (gameState.board[row][col].type === gameState.board[row + 1][col].type) {
+            return { r1: row, c1: col, r2: row + 1, c2: col };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  // ── WIN / LOSS ──
+  triggerWin() {
+    gameState.gameOver = true;
+    this.clearSelection();
+
+    // Staggered board clear
+    this.staggerBoardClear(() => {
+      // Show win overlay
+      const overlay = document.getElementById('win-overlay');
+      overlay.classList.add('active');
+      gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.4 });
+
+      // Animate stars
+      const movesLeft = gameState.moves;
+      const stars = movesLeft > 10 ? 3 : movesLeft > 3 ? 2 : 1;
+      for (let i = 1; i <= 3; i++) {
+        const star = document.getElementById(`star${i}`);
+        if (i <= stars) {
+          gsap.fromTo(star,
+            { scale: 0, opacity: 0 },
+            {
+              scale: 1, opacity: 1, duration: 0.4,
+              delay: i * 0.3,
+              ease: 'back.out(2)'
+            }
+          );
+        } else {
+          star.style.opacity = 0.2;
+          star.style.transform = 'scale(0.8)';
+        }
+      }
+
+      // Confetti
+      setTimeout(() => this.spawnWinConfetti(), 200);
+    });
+  }
+
+  staggerBoardClear(onComplete) {
+    let count = 0;
+    let total = 0;
+
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        if (this.tileSprites[row]?.[col]) total++;
+      }
+    }
+
+    if (total === 0) { onComplete(); return; }
+
+    let tileIdx = 0;
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        const sprite = this.tileSprites[row]?.[col];
+        if (!sprite) continue;
+        const delay = tileIdx * 30;
+        tileIdx++;
+
+        this.tweens.add({
+          targets: sprite,
+          scaleX: 0, scaleY: 0,
+          alpha: 0,
+          duration: 200,
+          delay,
+          ease: 'Power2.in',
+          onComplete: () => {
+            const { x, y } = this.getTileXY(row, col);
+            const type = gameState.board[row]?.[col]?.type ?? 0;
+            this.spawnMatchParticles(x, y, TILE_TYPES[type].color, 4);
+            count++;
+            if (count === total) setTimeout(onComplete, 200);
+          }
+        });
+      }
+    }
+  }
+
+  triggerLoss() {
+    gameState.gameOver = true;
+    this.clearSelection();
+
+    const remaining = Math.max(0, GOAL_COUNT - gameState.collected);
+    document.getElementById('proximity-msg').textContent =
+      `You needed ${remaining} more ${TILE_TYPES[GOAL_TYPE].emoji}`;
+
+    const overlay = document.getElementById('loss-overlay');
+    overlay.classList.add('active');
+    gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.4 });
+
+    // Gray out board
+    const canvas = this.sys.canvas;
+    gsap.to(canvas, { filter: 'grayscale(60%) brightness(70%)', duration: 0.5 });
+  }
+
+  spawnWinConfetti() {
+    const wrapper = document.getElementById('game-wrapper');
+    const colors = ['#D4A820', '#FFD060', '#E84040', '#4080E8', '#3CAE52', '#9040D8'];
+
+    for (let i = 0; i < 50; i++) {
+      const p = document.createElement('div');
+      p.className = 'confetti-piece';
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const size = 6 + Math.random() * 8;
+      p.style.cssText = `
+        background:${color};
+        width:${size}px;height:${size}px;
+        left:${Math.random() * 100}%;
+        top:-10px;
+        position:absolute;
+        transform:rotate(${Math.random() * 360}deg);
+        border-radius:${Math.random() > 0.5 ? '50%' : '2px'};
+      `;
+      wrapper.appendChild(p);
+
+      gsap.to(p, {
+        y: 900, x: (Math.random() - 0.5) * 300,
+        rotation: Math.random() * 720 - 360,
+        opacity: 0,
+        duration: 1.5 + Math.random() * 1,
+        delay: Math.random() * 0.8,
+        ease: 'power1.in',
+        onComplete: () => p.remove()
+      });
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// PHASER CONFIG
+// ══════════════════════════════════════════════════════
+const config = {
+  type: Phaser.AUTO,
+  width: 390,
+  height: 844,
+  backgroundColor: '#1A0D06',
+  parent: 'game-wrapper',
+  canvas: document.getElementById('phaser-canvas'),
+  scene: [GameScene],
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH
+  }
+};
+
+// ══════════════════════════════════════════════════════
+// START GAME
+// ══════════════════════════════════════════════════════
+const phaserGame = new Phaser.Game(config);
+
+// Initial UI state
+document.getElementById('goal-icon').textContent = TILE_TYPES[GOAL_TYPE].emoji;
+document.getElementById('goal-count').textContent = GOAL_COUNT;
+document.getElementById('moves-count').textContent = MAX_MOVES;
+
+function updateGoalDOM() {
+  const remaining = Math.max(0, GOAL_COUNT - gameState.collected);
+  document.getElementById('goal-count').textContent = remaining;
+}
+
+function restartGame() {
+  // Hide overlays
+  document.getElementById('win-overlay').classList.remove('active');
+  document.getElementById('loss-overlay').classList.remove('active');
+
+  // Reset canvas filter
+  const canvas = document.querySelector('#game-wrapper canvas');
+  if (canvas) gsap.set(canvas, { filter: 'none' });
+
+  // Reset state
+  gameState.moves = MAX_MOVES;
+  gameState.collected = 0;
+  gameState.selectedTile = null;
+  gameState.isAnimating = false;
+  gameState.tutorialShown = false;
+  gameState.gameOver = false;
+
+  // Update DOM
+  document.getElementById('moves-count').textContent = MAX_MOVES;
+  document.getElementById('moves-count').classList.remove('warning');
+  document.getElementById('goal-count').textContent = GOAL_COUNT;
+  gsap.set('#tutorial-toast', { opacity: 0, y: 0 });
+
+  // Restart scene
+  if (gameScene) {
+    gsap.killTweensOf('#goal-display');
+    gsap.set('#goal-display', { scale: 1 });
+    gameScene.initBoard();
+    setTimeout(() => gameScene.showTutorial(), 600);
+  }
+}
+</script>
+
+</body>
+</html>
